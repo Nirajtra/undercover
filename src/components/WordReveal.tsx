@@ -123,21 +123,25 @@ export const WordReveal = () => {
       <h2 className="text-2xl font-bold text-center mb-4 text-white">{currentPlayer.isEliminated ? t("wordReveal.titleEliminated") : t("wordReveal.titleDiscussion")}</h2>
       <Card className="p-6 text-center glass-morphism">
         <div className="space-y-4">
-          <p className="text-lg text-white">
-            {currentPlayer.isEliminated ? t("wordReveal.yourWordWas") : t("wordReveal.yourWordIs")}{" "}
-            <span
+          <div className="space-y-2">
+            <p className="text-lg text-white">
+              {currentPlayer.isEliminated ? t("wordReveal.yourWordWas") : t("wordReveal.yourWordIs")}
+            </p>
+            {/* Fixed-size box: the hidden placeholder and the revealed word take the same space, so nothing shifts */}
+            <div
               onClick={() => setRevealed(r => !r)}
               onMouseEnter={() => setRevealed(true)}
               onMouseLeave={() => setRevealed(false)}
               title={t("wordReveal.hoverToReveal", "Hover or tap to reveal")}
-              className={`font-bold inline-block cursor-pointer select-none rounded px-2 align-middle transition-colors duration-200 ${revealed ? "text-primary" : "min-w-[8rem] bg-white/20 text-white/40 tracking-widest"}`}
+              className={`mx-auto flex h-12 w-full max-w-xs items-center justify-center rounded-lg px-3 text-xl font-bold cursor-pointer select-none transition-colors duration-200 ${revealed ? "bg-white/10 text-primary" : "bg-white/20 text-white/40 tracking-widest"}`}
             >
-              {/* Hidden state renders a fixed-width placeholder so word length and color don't leak */}
-              {revealed
-                ? (currentPlayer.role === "mrwhite" ? t("wordReveal.mrWhite") : currentPlayer.word)
-                : "••••••"}
-            </span>
-          </p>
+              <span className="truncate">
+                {revealed
+                  ? (currentPlayer.role === "mrwhite" ? t("wordReveal.mrWhite") : currentPlayer.word)
+                  : "••••••"}
+              </span>
+            </div>
+          </div>
           <p className="text-xs text-white/50">{t("wordReveal.hoverToReveal", "Hover or tap to reveal")}</p>
           <p className="text-sm text-white/70">
             {currentPlayer.role === "mrwhite" && revealed
