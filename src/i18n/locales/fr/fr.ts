@@ -73,6 +73,7 @@ export default {
       cannotUseWordDirectly: "Vous ne pouvez pas utiliser le mot directement !",
       timeLeft: "{{seconds}}s",
       timeUpSkipped: "⏱ Temps écoulé",
+      commentsSoFar: "Commentaires jusqu'ici",
     },
     voting: {
       inProgress: "Vote en cours",
@@ -114,6 +115,16 @@ export default {
       undercover: "Infiltré",
       mrwhite: "Mr. White",
       spectator: "Spectateur",
+    },
+    history: {
+      title: "Commentaires précédents",
+      game: "Partie {{number}}",
+      inProgress: "(en cours)",
+      words: "Mots : {{majority}} / {{undercover}}",
+      player: "Joueur",
+      role: "Rôle",
+      round: "Manche {{number}}",
+      out: "éliminé",
     },
     peer: {
       connectionError: "Une erreur de connexion est survenue",

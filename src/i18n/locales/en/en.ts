@@ -70,6 +70,7 @@ export default {
       cannotUseWordDirectly: "You can't use the word directly!",
       timeLeft: "{{seconds}}s",
       timeUpSkipped: "⏱ Time's up",
+      commentsSoFar: "Comments so far",
     },
     voting: {
       inProgress: "Voting in Progress",
@@ -111,6 +112,16 @@ export default {
       undercover: "Undercover",
       mrwhite: "Mr. White",
       spectator: "Spectator",
+    },
+    history: {
+      title: "Previous comments",
+      game: "Game {{number}}",
+      inProgress: "(in progress)",
+      words: "Words: {{majority}} / {{undercover}}",
+      player: "Player",
+      role: "Role",
+      round: "Round {{number}}",
+      out: "out",
     },
     peer: {
       connectionError: "Connection error occurred",

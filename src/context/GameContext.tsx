@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from "react";
-import { GameState, Player, GamePhase, PlayerRole, RoleDistribution } from "../types/game";
+import { GameState, Player, GamePhase, PlayerRole, RoleDistribution, RoundRecord } from "../types/game";
 import { toast } from "sonner";
 import { calculateDefaultDistribution } from "../config/roleDistribution";
 import { useTranslation } from "react-i18next";
@@ -167,6 +167,8 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         players,
         majorityWord,
         undercoverWord,
+        // Comments made for the old words no longer apply
+        history: (prev.history ?? []).filter(r => !(r.game === (prev.gameNumber ?? 1) && r.round === 1)),
       };
     });
   };
@@ -209,6 +211,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
           undercoverWord,
           currentRound: 1,
           mrWhiteGuess: undefined,
+          gameNumber: (prev.gameNumber ?? 0) + 1,
         };
       } else {
         return {
@@ -224,12 +227,44 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
+  // Record this round's comments so they can be looked back on later. Called on every
+  // comment, so the table is always up to date; existing comments are never dropped.
+  const snapshotRound = (prev: GameState): RoundRecord[] => {
+    const game = prev.gameNumber ?? 1;
+    const existing = prev.history?.find(r => r.game === game && r.round === prev.currentRound);
+    const entries: RoundRecord["entries"] = (prev.speakingOrder ?? [])
+      .map(id => prev.players.find(p => p.id === id))
+      .filter((p): p is Player => !!p && !p.isEliminated)
+      .map(p => ({
+        playerId: p.id,
+        name: p.name,
+        role: p.role,
+        text: p.submittedDescription ?? existing?.entries.find(e => e.playerId === p.id)?.text,
+      }));
+    // Keep comments from players who left mid-round
+    existing?.entries.forEach(e => {
+      if (!entries.some(x => x.playerId === e.playerId)) entries.push(e);
+    });
+    const record: RoundRecord = {
+      game,
+      round: prev.currentRound,
+      majorityWord: prev.majorityWord,
+      undercoverWord: prev.undercoverWord,
+      eliminatedId: existing?.eliminatedId,
+      entries,
+    };
+    const others = (prev.history ?? []).filter(r => r !== existing);
+    return [...others, record];
+  };
+
   const setPhase = (phase: GamePhase) => {
     setGameState((prev) => ({
       ...prev,
       phase,
       // Fresh vote whenever voting (re)starts
-      ...(phase === "voting" ? { votingResults: {}, tieCandidates: undefined } : {}),
+      ...(phase === "voting"
+        ? { votingResults: {}, tieCandidates: undefined, history: snapshotRound(prev) }
+        : {}),
     }));
   };
 
@@ -242,10 +277,8 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         p.id === playerId ? { ...p, submittedDescription } : p
       );
 
-      return {
-        ...prev,
-        players: updatedPlayers,
-      };
+      const next = { ...prev, players: updatedPlayers };
+      return { ...next, history: snapshotRound(next) };
     });
   };
 
@@ -285,12 +318,17 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
     const eliminatedId = mostVotedPlayers[Math.floor(Math.random() * mostVotedPlayers.length)];
 
+    const history = (prev.history ?? []).map(r =>
+      r.game === (prev.gameNumber ?? 1) && r.round === prev.currentRound ? { ...r, eliminatedId } : r
+    );
+
     return {
       ...prev,
       votingResults,
       tieCandidates: undefined,
       phase: "results",
       lastEliminatedId: eliminatedId,
+      history,
     };
   };
 
@@ -375,6 +413,8 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         mrWhiteGuess: undefined,
         roleDistribution: prev.roleDistribution,
         turnTimer: prev.turnTimer,
+        gameNumber: prev.gameNumber,
+        history: prev.history,
       };
     });
   };

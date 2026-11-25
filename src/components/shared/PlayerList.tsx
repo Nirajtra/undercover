@@ -16,6 +16,8 @@ interface PlayerListProps {
   lastEliminatedId?: string;
   showScores?: boolean;
   tieBreakerPlayers?: string[];
+  alwaysShowVotes?: boolean; // show votes even before the current player has voted
+  allPlayers?: Player[]; // for voter names when `players` is filtered (e.g. tie re-vote)
 }
 
 export const PlayerList = ({
@@ -29,6 +31,8 @@ export const PlayerList = ({
   lastEliminatedId,
   showScores,
   tieBreakerPlayers = [],
+  alwaysShowVotes,
+  allPlayers,
 }: PlayerListProps) => {
   const { playSound } = useSound();
   const { t } = useTranslation();
@@ -91,7 +95,7 @@ export const PlayerList = ({
     if (!votingResults) return [];
     return Object.entries(votingResults)
       .filter(([_, targetId]) => targetId === playerId)
-      .map(([voterId]) => players.find(p => p.id === voterId)?.name || '');
+      .map(([voterId]) => (allPlayers ?? players).find(p => p?.id === voterId)?.name || '');
   };
 
   const hasCurrentPlayerVoted = currentPlayerId && votingResults?.[currentPlayerId];
@@ -115,7 +119,7 @@ export const PlayerList = ({
             if (!speakingOrder && currentPlayerId && !hasCurrentPlayerVoted && player.id === currentPlayerId) return null;
 
             const votes = getVotesForPlayer(player.id);
-            const showVotes = (hasCurrentPlayerVoted || isCurrentPlayerEliminated) && votes.length > 0;
+            const showVotes = (alwaysShowVotes || hasCurrentPlayerVoted || isCurrentPlayerEliminated) && votes.length > 0;
             const isLastEliminated = player.id === lastEliminatedId;
             const isCurrentSpeaker = speakingOrder && index === currentSpeakerIndex;
             const isHighlighted = highlightedPlayer === player.id;

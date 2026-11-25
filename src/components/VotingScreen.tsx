@@ -126,8 +126,10 @@ export const VotingScreen = () => {
       t("voting.inProgress"),
       <PlayerList
         players={activePlayers}
+        allPlayers={gameState.players}
         votingResults={gameState.votingResults}
         currentPlayerId={peer?.id}
+        alwaysShowVotes
       />
     );
   }
@@ -139,8 +141,10 @@ export const VotingScreen = () => {
         players={activePlayers}
         selectedPlayer={selectedPlayer}
         onPlayerClick={!hasVoted ? setSelectedPlayer : undefined}
+        allPlayers={gameState.players}
         votingResults={gameState.votingResults}
         currentPlayerId={peer?.id}
+        alwaysShowVotes
       />
 
       {!hasVoted && (

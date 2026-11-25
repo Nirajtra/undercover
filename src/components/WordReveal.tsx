@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import { useCountdown } from "@/hooks/use-countdown";
 import { CountdownBar } from "./shared/CountdownBar";
+import { RoundTable } from "./shared/RoundTable";
+import { RoundRecord } from "@/types/game";
 
 export const WordReveal = () => {
   const { gameState, setPhase, submitDescription, rerollWords } = useGame();
@@ -105,8 +107,23 @@ export const WordReveal = () => {
   const myIndex = gameState.speakingOrder ? speakingOrderPlayers.findIndex(p => p.id === currentPlayer.id) : 0;
   const isMyTurn = gameState.speakingOrder && currentSpeakerIndex === myIndex;
 
-  return (
-    <div className="max-w-md mx-auto p-6 space-y-4 animate-fade-in">
+  // From round 2 on, show this game's earlier rounds next to the live current round
+  const gameNumber = gameState.gameNumber ?? 1;
+  const roundTable: RoundRecord[] = gameState.currentRound >= 2
+    ? [
+      ...(gameState.history ?? []).filter(r => r.game === gameNumber && r.round < gameState.currentRound),
+      {
+        game: gameNumber,
+        round: gameState.currentRound,
+        majorityWord: "",
+        undercoverWord: "",
+        entries: speakingOrderPlayers.map(p => ({ playerId: p.id, name: p.name, text: p.submittedDescription })),
+      },
+    ]
+    : [];
+
+  const main = (
+    <div className="space-y-4">
       <h2 className="text-2xl font-bold text-center mb-4 text-white">{currentPlayer.isEliminated ? t("wordReveal.titleEliminated") : t("wordReveal.titleDiscussion")}</h2>
       <Card className="p-6 text-center glass-morphism">
         <div className="space-y-4">
@@ -210,6 +227,21 @@ export const WordReveal = () => {
           )}
         </div>
       )}
+    </div>
+  );
+
+  if (roundTable.length === 0) {
+    return <div className="max-w-md mx-auto p-6 animate-fade-in">{main}</div>;
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto p-6 animate-fade-in grid gap-6 md:grid-cols-[minmax(0,1fr)_28rem] md:items-start">
+      {/* Left on desktop, below the main content on mobile */}
+      <div className="order-last md:order-first space-y-2 md:sticky md:top-4">
+        <h3 className="text-lg font-semibold text-white">{t("wordReveal.commentsSoFar")}</h3>
+        <RoundTable rounds={roundTable} highlightPlayerId={currentSpeakerId} />
+      </div>
+      {main}
     </div>
   );
 };

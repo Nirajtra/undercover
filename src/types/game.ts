@@ -15,6 +15,16 @@ export type Player = {
   submittedDescription?: string;
 };
 
+// Snapshot of one round's comments, taken when voting starts
+export type RoundRecord = {
+  game: number;
+  round: number;
+  majorityWord: string;
+  undercoverWord: string;
+  entries: { playerId: string; name: string; role?: PlayerRole; text?: string }[];
+  eliminatedId?: string;
+};
+
 export type GamePhase = "setup" | "wordReveal" | "discussion" | "voting" | "results" | "gameEnd";
 
 export type GameState = {
@@ -31,4 +41,6 @@ export type GameState = {
   roleDistribution: RoleDistribution;
   turnTimer?: number; // seconds per speaker turn, 0/undefined = no timer
   tieCandidates?: string[]; // set during a re-vote: only these players can be voted for
+  gameNumber?: number; // increments every time a new game starts from setup
+  history?: RoundRecord[];
 };

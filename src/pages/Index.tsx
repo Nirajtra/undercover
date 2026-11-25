@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Volume2, VolumeX } from "lucide-react";
 import { SoundProvider, useSound } from "@/context/SoundContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { CommentHistory } from "@/components/shared/CommentHistory";
 
 const MuteToggle = () => {
   const { isMuted, toggleMute } = useSound();
@@ -30,12 +31,24 @@ const MuteToggle = () => {
 };
 
 const GameContent = () => {
-  const { gameState } = useGame();
   const { hostId } = usePeer();
 
   if (!hostId) {
     return <MultiplayerSetup />;
   }
+
+  return (
+    <>
+      <PhaseScreen />
+      <div className="mx-auto w-full max-w-3xl px-6">
+        <CommentHistory />
+      </div>
+    </>
+  );
+};
+
+const PhaseScreen = () => {
+  const { gameState } = useGame();
 
   if (gameState.phase === "setup" && gameState.currentRound === 0) {
     return <GameSetup />;
