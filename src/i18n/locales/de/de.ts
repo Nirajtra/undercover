@@ -76,6 +76,8 @@ export default {
       voteToEliminate: "Zum Eliminieren abstimmen",
       submitVote: "Stimme abgeben",
       tieRevote: "Gleichstand! Stimmt erneut ab zwischen: {{names}}",
+      stillToVote: "Noch abzustimmen ({{count}})",
+      everyoneVoted: "Alle haben abgestimmt",
     },
     results: {
       title: "Ergebnisse",

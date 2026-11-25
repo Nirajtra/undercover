@@ -13,6 +13,7 @@ interface GameContextType {
   startGame: () => void;
   setPhase: (phase: GamePhase) => void;
   submitVote: (voterId: string, targetId: string) => void;
+  closeVoting: () => void;
   submitMrWhiteGuess: (guess: string) => void;
   submitDescription: (playerId: string, description: string) => void;
   resetGame: () => void;
@@ -248,8 +249,55 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
+  // Tally the votes cast so far and move on: elimination, or a re-vote on a tie
+  const resolveVotes = (prev: GameState, votingResults: Record<string, string>): GameState => {
+    const voteCount: Record<string, number> = {};
+    Object.values(votingResults).forEach(id => {
+      voteCount[id] = (voteCount[id] || 0) + 1;
+    });
+
+    // Find the highest vote count
+    const maxVotes = Math.max(...Object.values(voteCount));
+
+    // Get all players with the highest votes
+    let mostVotedPlayers = Object.entries(voteCount)
+      .filter(([_, votes]) => votes === maxVotes)
+      .map(([id]) => id);
+
+    // Nobody voted before the timer ran out: every valid target is "tied" and gets drawn from
+    const noVotes = mostVotedPlayers.length === 0;
+    if (noVotes) {
+      mostVotedPlayers = prev.tieCandidates
+        ?? prev.players.filter(p => !p.isEliminated).map(p => p.id);
+    }
+
+    // Tie: re-vote between only the tied players. If a re-vote ties between the
+    // exact same players again it's a deadlock, so fall back to a random pick.
+    const isDeadlock = prev.tieCandidates?.length === mostVotedPlayers.length
+      && mostVotedPlayers.every(id => prev.tieCandidates.includes(id));
+    if (mostVotedPlayers.length > 1 && !isDeadlock && !noVotes) {
+      return {
+        ...prev,
+        votingResults: {},
+        tieCandidates: mostVotedPlayers,
+      };
+    }
+
+    const eliminatedId = mostVotedPlayers[Math.floor(Math.random() * mostVotedPlayers.length)];
+
+    return {
+      ...prev,
+      votingResults,
+      tieCandidates: undefined,
+      phase: "results",
+      lastEliminatedId: eliminatedId,
+    };
+  };
+
   const submitVote = (voterId: string, targetId: string) => {
     setGameState((prev) => {
+      // Ignore votes that arrive after voting closed
+      if (prev.phase !== "voting") return prev;
       // During a re-vote only the tied players are valid targets
       if (prev.tieCandidates && !prev.tieCandidates.includes(targetId)) return prev;
 
@@ -258,47 +306,21 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       const allVoted = activePlayers.every(p => p.id in newVotingResults);
 
       if (allVoted) {
-        // Elimination logic
-        const voteCount: Record<string, number> = {};
-        Object.values(newVotingResults).forEach(id => {
-          voteCount[id] = (voteCount[id] || 0) + 1;
-        });
-
-        // Find the highest vote count
-        const maxVotes = Math.max(...Object.values(voteCount));
-
-        // Get all players with the highest votes
-        const mostVotedPlayers = Object.entries(voteCount)
-          .filter(([_, votes]) => votes === maxVotes)
-          .map(([id]) => id);
-
-        // Tie: re-vote between only the tied players. If a re-vote ties between the
-        // exact same players again it's a deadlock, so fall back to a random pick.
-        const isDeadlock = prev.tieCandidates?.length === mostVotedPlayers.length
-          && mostVotedPlayers.every(id => prev.tieCandidates.includes(id));
-        if (mostVotedPlayers.length > 1 && !isDeadlock) {
-          return {
-            ...prev,
-            votingResults: {},
-            tieCandidates: mostVotedPlayers,
-          };
-        }
-
-        const eliminatedId = mostVotedPlayers[Math.floor(Math.random() * mostVotedPlayers.length)];
-
-        return {
-          ...prev,
-          votingResults: newVotingResults,
-          tieCandidates: undefined,
-          phase: "results",
-          lastEliminatedId: eliminatedId,
-        };
+        return resolveVotes(prev, newVotingResults);
       }
 
       return {
         ...prev,
         votingResults: newVotingResults
       };
+    });
+  };
+
+  // Called by the host when the voting timer runs out; players who didn't vote are skipped
+  const closeVoting = () => {
+    setGameState((prev) => {
+      if (prev.phase !== "voting") return prev;
+      return resolveVotes(prev, prev.votingResults || {});
     });
   };
 
@@ -381,6 +403,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         startGame,
         setPhase,
         submitVote,
+        closeVoting,
         submitMrWhiteGuess,
         submitDescription,
         resetGame,

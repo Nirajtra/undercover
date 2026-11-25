@@ -79,6 +79,8 @@ export default {
       voteToEliminate: "Voter pour éliminer",
       submitVote: "Valider le vote",
       tieRevote: "Égalité ! Votez à nouveau entre : {{names}}",
+      stillToVote: "Doivent encore voter ({{count}})",
+      everyoneVoted: "Tout le monde a voté",
     },
     results: {
       title: "Résultats",

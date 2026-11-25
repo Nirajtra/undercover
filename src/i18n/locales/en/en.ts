@@ -76,6 +76,8 @@ export default {
       voteToEliminate: "Vote to Eliminate",
       submitVote: "Submit Vote",
       tieRevote: "It's a tie! Vote again between: {{names}}",
+      stillToVote: "Still to vote ({{count}})",
+      everyoneVoted: "Everyone has voted",
     },
     results: {
       title: "Results",
