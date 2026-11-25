@@ -41,9 +41,18 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const addPlayer = (name: string, id: string) => {
     setGameState((prev) => {
+      // Same connection joining twice (e.g. double-clicked Join) — keep the existing player
+      if (prev.players.some(p => p.id === id)) return prev;
+
       if (prev.players.length >= 10) {
         toast.error(t("gameSetup.maxPlayers"));
         return prev;
+      }
+
+      // Two different people with the same name get "Name 2", "Name 3", ...
+      let uniqueName = name;
+      for (let n = 2; prev.players.some(p => p.name.toLowerCase() === uniqueName.toLowerCase()); n++) {
+        uniqueName = `${name} ${n}`;
       }
 
       const score = 0;
@@ -54,7 +63,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         isEliminated = true;
       }
 
-      const newPlayers = [...prev.players, { id, name, role, isEliminated, score }];
+      const newPlayers = [...prev.players, { id, name: uniqueName, role, isEliminated, score }];
       return {
         ...prev,
         players: newPlayers,
@@ -206,6 +215,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
           speakingOrder: generateSpeakingOrder(prev.players),
           phase: "wordReveal",
           votingResults: {},
+          tieCandidates: undefined,
           currentRound: prev.currentRound + 1,
           mrWhiteGuess: undefined,
         };
@@ -214,7 +224,12 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const setPhase = (phase: GamePhase) => {
-    setGameState((prev) => ({ ...prev, phase }));
+    setGameState((prev) => ({
+      ...prev,
+      phase,
+      // Fresh vote whenever voting (re)starts
+      ...(phase === "voting" ? { votingResults: {}, tieCandidates: undefined } : {}),
+    }));
   };
 
   const submitDescription = (playerId: string, submittedDescription: string) => {
@@ -235,6 +250,9 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const submitVote = (voterId: string, targetId: string) => {
     setGameState((prev) => {
+      // During a re-vote only the tied players are valid targets
+      if (prev.tieCandidates && !prev.tieCandidates.includes(targetId)) return prev;
+
       const newVotingResults = { ...(prev.votingResults || {}), [voterId]: targetId };
       const activePlayers = prev.players.filter(p => !p.isEliminated);
       const allVoted = activePlayers.every(p => p.id in newVotingResults);
@@ -254,12 +272,24 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
           .filter(([_, votes]) => votes === maxVotes)
           .map(([id]) => id);
 
-        // Randomly select one of the most voted players
+        // Tie: re-vote between only the tied players. If a re-vote ties between the
+        // exact same players again it's a deadlock, so fall back to a random pick.
+        const isDeadlock = prev.tieCandidates?.length === mostVotedPlayers.length
+          && mostVotedPlayers.every(id => prev.tieCandidates.includes(id));
+        if (mostVotedPlayers.length > 1 && !isDeadlock) {
+          return {
+            ...prev,
+            votingResults: {},
+            tieCandidates: mostVotedPlayers,
+          };
+        }
+
         const eliminatedId = mostVotedPlayers[Math.floor(Math.random() * mostVotedPlayers.length)];
 
         return {
           ...prev,
           votingResults: newVotingResults,
+          tieCandidates: undefined,
           phase: "results",
           lastEliminatedId: eliminatedId,
         };
@@ -289,6 +319,9 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const submitMrWhiteGuess = (guess: string) => {
     setGameState((prev) => {
+      // Ignore a late guess arriving after the timer already ended the guess
+      if (prev.mrWhiteGuess) return prev;
+
       if (guess.toLowerCase() === prev.majorityWord.toLowerCase()) {
         return {
           ...prev,

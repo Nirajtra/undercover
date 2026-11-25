@@ -10,9 +10,24 @@ import { VotingScreen } from "../components/VotingScreen";
 import { Results } from "../components/Results";
 import { GameEnd } from "../components/GameEnd";
 import { Button } from "@/components/ui/button";
-import { Github } from "lucide-react";
-import { SoundProvider } from "@/context/SoundContext";
+import { Volume2, VolumeX } from "lucide-react";
+import { SoundProvider, useSound } from "@/context/SoundContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+
+const MuteToggle = () => {
+  const { isMuted, toggleMute } = useSound();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={toggleMute}
+      aria-label={isMuted ? "Unmute" : "Mute"}
+      className="h-9 w-9 rounded-full border border-white/10 bg-black/30 text-white hover:bg-white/10"
+    >
+      {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+    </Button>
+  );
+};
 
 const GameContent = () => {
   const { gameState } = useGame();
@@ -52,7 +67,8 @@ const Index = () => {
           <GameProvider>
             <PeerProvider>
               <div className="mx-auto flex max-w-4xl flex-col gap-4">
-                <div className="flex justify-end">
+                <div className="flex justify-end gap-2">
+                  <MuteToggle />
                   <LanguageSwitcher />
                 </div>
                 <GameContent />
@@ -60,22 +76,6 @@ const Index = () => {
             </PeerProvider>
           </GameProvider>
         </SoundProvider>
-      </div>
-      <div className="hidden md:block">
-        <a
-          href="https://github.com/antebrl/undercover-word-game"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="fixed bottom-4 left-4 md:bottom-8 md:left-8"
-        >
-          <Button
-            variant="secondary"
-            className="glass-morphism hover:bg-white/10 transition-all duration-300"
-          >
-            <Github className="mr-2 h-4 w-4" />
-            View on GitHub
-          </Button>
-        </a>
       </div>
     </div>
   );

@@ -30,4 +30,5 @@ export type GameState = {
   mrWhiteGuess?: string;
   roleDistribution: RoleDistribution;
   turnTimer?: number; // seconds per speaker turn, 0/undefined = no timer
+  tieCandidates?: string[]; // set during a re-vote: only these players can be voted for
 };

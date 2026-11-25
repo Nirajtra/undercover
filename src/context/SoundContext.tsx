@@ -11,7 +11,22 @@ const SoundContext = createContext<{
 });
 
 export const SoundProvider = ({ children }: { children: React.ReactNode }) => {
-  const [isMuted, setIsMuted] = useState(false);
+  // Muted by default so nothing plays out loud in the office; the choice is remembered per browser
+  const [isMuted, setIsMuted] = useState(() => {
+    try {
+      return localStorage.getItem("muted") !== "false";
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("muted", String(isMuted));
+    } catch {
+      // storage unavailable — keep in-memory state only
+    }
+  }, [isMuted]);
   const audioCache = new Map<string, HTMLAudioElement>();
 
   useEffect(() => {

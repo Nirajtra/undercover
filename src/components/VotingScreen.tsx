@@ -13,23 +13,40 @@ export const VotingScreen = () => {
   const [selectedPlayer, setSelectedPlayer] = useState<string>("");
   const { t } = useTranslation();
 
+  const tieCandidates = gameState.tieCandidates;
+
+  // Play again and clear the old selection when a tie re-vote starts
   useEffect(() => {
     playSound("/sounds/new-page.mp3");
-  }, []);
+    setSelectedPlayer("");
+  }, [tieCandidates?.join(",")]);
 
   const currentPlayer = gameState.players.find(p => p.id === peer?.id);
   const hasVoted = currentPlayer && gameState.votingResults?.[currentPlayer.id];
   const isEliminated = currentPlayer?.isEliminated;
 
-  // Sort players by speaking order (and filter out eliminated players)
+  // Sort players by speaking order (and filter out eliminated players);
+  // during a re-vote only the tied players are shown
   const activePlayers = gameState.speakingOrder
-    .map(id => gameState.players.find(p => p.id === id));
+    .map(id => gameState.players.find(p => p.id === id))
+    .filter(p => p && (!tieCandidates || tieCandidates.includes(p.id)));
+
+  const tieNames = tieCandidates
+    ?.map(id => gameState.players.find(p => p.id === id)?.name)
+    .filter(Boolean)
+    .join(", ");
+  const tieBanner = tieCandidates && (
+    <p className="text-center text-sm text-white/80 -mt-2">
+      {t("voting.tieRevote", { names: tieNames })}
+    </p>
+  );
 
   // Don't show voting UI if player is eliminated
   if (isEliminated) {
     return (
       <div className="max-w-md mx-auto p-6 space-y-6 animate-fade-in">
         <h2 className="text-2xl font-bold text-center mb-4 text-gradient">{t("voting.inProgress")}</h2>
+        {tieBanner}
         <PlayerList
           players={activePlayers}
           votingResults={gameState.votingResults}
@@ -58,6 +75,7 @@ export const VotingScreen = () => {
   return (
     <div className="max-w-md mx-auto p-6 space-y-6 animate-fade-in">
       <h2 className="text-2xl font-bold text-center mb-4 text-gradient">{t("voting.voteToEliminate")}</h2>
+      {tieBanner}
 
       <PlayerList
         players={activePlayers}

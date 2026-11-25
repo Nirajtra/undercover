@@ -8,7 +8,8 @@ import { useSound } from "@/context/SoundContext";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
-import { Timer } from "lucide-react";
+import { useCountdown } from "@/hooks/use-countdown";
+import { CountdownBar } from "./shared/CountdownBar";
 
 export const WordReveal = () => {
   const { gameState, setPhase, submitDescription, rerollWords } = useGame();
@@ -18,7 +19,6 @@ export const WordReveal = () => {
 
   const [description, setDescription] = useState("");
   const [revealed, setRevealed] = useState(false);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   const turnTimer = gameState.turnTimer ?? 0;
   const currentSpeakerId = gameState.speakingOrder
@@ -26,20 +26,7 @@ export const WordReveal = () => {
     .find(p => p && !p.isEliminated && !p.submittedDescription)?.id;
 
   // Local countdown, restarted whenever the speaker changes
-  useEffect(() => {
-    if (!turnTimer || !currentSpeakerId) {
-      setTimeLeft(null);
-      return;
-    }
-    const endsAt = Date.now() + turnTimer * 1000;
-    setTimeLeft(turnTimer);
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
-      setTimeLeft(remaining);
-      if (remaining === 0) clearInterval(interval);
-    }, 250);
-    return () => clearInterval(interval);
-  }, [currentSpeakerId, turnTimer]);
+  const timeLeft = useCountdown(turnTimer, currentSpeakerId);
 
   // When time runs out, the speaker submits whatever they typed
   useEffect(() => {
@@ -166,26 +153,15 @@ export const WordReveal = () => {
       <div className="mt-8 space-y-4">
         <h3 className="text-xl font-semibold text-white text-center">{isMyTurn ? t("wordReveal.yourTurn") : t("wordReveal.speakingOrder")}</h3>
 
-        {timeLeft !== null && (
-          <div className="space-y-1">
-            <div className={`flex items-center justify-center gap-2 font-mono text-lg font-bold ${timeLeft <= 5 ? "text-red-500 animate-pulse" : "text-white"}`}>
-              <Timer className="h-5 w-5" />
-              {t("wordReveal.timeLeft", { seconds: timeLeft })}
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ease-linear ${timeLeft <= 5 ? "bg-red-500" : "bg-primary"}`}
-                style={{ width: `${(timeLeft / turnTimer) * 100}%` }}
-              />
-            </div>
-          </div>
-        )}
+        {timeLeft !== null && <CountdownBar timeLeft={timeLeft} total={turnTimer} />}
 
         {isMyTurn && (
           <div className="relative flex h-10 w-full min-w-[200px]">
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, 100))}
+              onKeyDown={(e) => { if (e.key === "Enter") handleSubmitDescription(); }}
+              autoFocus
               placeholder={t("wordReveal.enterWordOrPhrase")}
               maxLength={25}
               className="peer h-full w-full rounded-[7px] border px-3 py-2.5 pr-20 text-sm font-normal outline-none transition-all"

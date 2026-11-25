@@ -11,7 +11,9 @@ import { useTranslation } from "react-i18next";
 export const MultiplayerSetup = () => {
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
-  const { hostGame, joinGame, hostId } = usePeer();
+  const { peer, hostGame, joinGame, hostId, isConnecting } = usePeer();
+  // Not ready until the peer server handed us an ID; busy while a join is in flight
+  const isBusy = !peer || isConnecting;
   const [showJoinForm, setShowJoinForm] = useState(searchParams.get("gameId") != undefined);
   const [showHostForm, setShowHostForm] = useState(false);
   const [joinId, setJoinId] = useState(showJoinForm ? searchParams.get("gameId") : "");
@@ -26,6 +28,7 @@ export const MultiplayerSetup = () => {
   }, [searchParams]);
 
   const handleJoin = () => {
+    if (isBusy) return;
     if (!joinId.trim()) {
       toast.error(t("multiplayerSetup.enterGameIdError"));
       return;
@@ -38,6 +41,7 @@ export const MultiplayerSetup = () => {
   };
 
   const handleHost = () => {
+    if (isBusy) return;
     if (!username.trim()) {
       toast.error(t("multiplayerSetup.enterUsernameError"));
       return;
@@ -48,8 +52,6 @@ export const MultiplayerSetup = () => {
   return (
     <Card className="max-w-md mx-auto p-6 space-y-6 animate-fade-in glass-morphism">
       <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-center text-gradient">{t('welcome')}</h2>
-
         {!showHostForm && !showJoinForm && (
           <div className="space-y-4">
             <Button
@@ -79,39 +81,49 @@ export const MultiplayerSetup = () => {
         )}
 
         {showHostForm && (
-          <div className="space-y-4 animate-fade-in">
+          <form
+            className="space-y-4 animate-fade-in"
+            onSubmit={(e) => { e.preventDefault(); handleHost(); }}
+          >
             <Input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder={t("multiplayerSetup.enterUsername")}
               maxLength={25}
+              autoFocus
               className="w-full bg-secondary/20 border-secondary/30"
             />
             <Button
-              onClick={handleHost}
+              type="submit"
+              disabled={isBusy}
               className="w-full bg-primary hover:bg-primary/90"
             >
-              {t("multiplayerSetup.startHosting")}
+              {isBusy ? t("multiplayerSetup.connecting") : t("multiplayerSetup.startHosting")}
             </Button>
             <Button
+              type="button"
               variant="ghost"
               onClick={() => setShowHostForm(false)}
               className="w-full"
             >
               {t("multiplayerSetup.back")}
             </Button>
-          </div>
+          </form>
         )}
 
         {showJoinForm && (
-          <div className="space-y-4 animate-fade-in">
+          <form
+            className="space-y-4 animate-fade-in"
+            onSubmit={(e) => { e.preventDefault(); handleJoin(); }}
+          >
             <Input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder={t("multiplayerSetup.enterUsername")}
               maxLength={25}
+              autoFocus
               className="w-full bg-secondary/20 border-secondary/30"
             />
             <Input
@@ -122,19 +134,21 @@ export const MultiplayerSetup = () => {
               className="w-full bg-secondary/20 border-secondary/30"
             />
             <Button
-              onClick={handleJoin}
+              type="submit"
+              disabled={isBusy}
               className="w-full bg-primary hover:bg-primary/90"
             >
-              {t("multiplayerSetup.joinGame")}
+              {isBusy ? t("multiplayerSetup.connecting") : t("multiplayerSetup.joinGame")}
             </Button>
             <Button
+              type="button"
               variant="ghost"
               onClick={() => setShowJoinForm(false)}
               className="w-full"
             >
               {t("multiplayerSetup.back")}
             </Button>
-          </div>
+          </form>
         )}
       </div>
     </Card>

@@ -21,6 +21,7 @@ export default {
       back: "Retour",
       enterGameIdError: "Veuillez entrer un ID de partie !",
       enterUsernameError: "Veuillez entrer votre pseudo !",
+      connecting: "Connexion...",
     },
     gameSetup: {
       title: "Configuration de la partie",
@@ -77,6 +78,7 @@ export default {
       inProgress: "Vote en cours",
       voteToEliminate: "Voter pour éliminer",
       submitVote: "Valider le vote",
+      tieRevote: "Égalité ! Votez à nouveau entre : {{names}}",
     },
     results: {
       title: "Résultats",
@@ -87,6 +89,7 @@ export default {
       theirWordWas: "Leur mot était :",
       finalGuess: "Faites votre dernière supposition !",
       enterGuess: "Entrez votre supposition...",
+      timeUpNoGuess: "⏱ Temps écoulé",
       guessRequired: "Veuillez entrer une supposition",
       continueGame: "Continuer la partie",
     },
@@ -117,6 +120,8 @@ export default {
       gameHosted: "Partie hébergée ! Partagez cet ID avec les joueurs : {{id}}",
       connected: "Connecté à la partie !",
       hostClosedConnection: "L'hôte a fermé la connexion",
+      gameNotFound: "Aucune partie trouvée avec cet ID",
+      joinTimeout: "Impossible de rejoindre la partie. Vérifiez l'ID ou essayez un autre réseau/navigateur.",
     },
     wordPairs: wordPairs,
   },

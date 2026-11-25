@@ -10,6 +10,8 @@ import { useSound } from "@/context/SoundContext";
 import { MrWhiteGuess } from "./shared/MrWhiteGuess";
 import { PlayerList } from "./shared/PlayerList";
 import { useTranslation } from "react-i18next";
+import { useCountdown } from "@/hooks/use-countdown";
+import { CountdownBar } from "./shared/CountdownBar";
 
 export const Results = () => {
   const { gameState, setGameState, submitMrWhiteGuess, eliminatePlayer, checkGameEnd } = useGame();
@@ -72,6 +74,27 @@ export const Results = () => {
   const currentPlayerGotEliminated = eliminatedPlayer?.id === currentPlayer?.id;
   const isMrWhiteGuessing = eliminatedPlayer?.role === "mrwhite" && !gameState.mrWhiteGuess;
   const canContinue = isHost && !isMrWhiteGuessing;
+
+  // Mr. White gets double the turn timer for the final guess
+  const guessTimer = (gameState.turnTimer ?? 0) * 2;
+  const guessTimerKey = showEliminatedCard && isMrWhiteGuessing ? gameState.lastEliminatedId : undefined;
+  const guessTimeLeft = useCountdown(guessTimer, guessTimerKey);
+
+  // When time runs out, Mr. White submits whatever they typed
+  useEffect(() => {
+    if (guessTimeLeft === 0 && currentPlayerGotEliminated && guess.trim()) {
+      handleGuessSubmit();
+    }
+  }, [guessTimeLeft]);
+
+  // The host ends the guess if nothing arrived shortly after the timer ended
+  useEffect(() => {
+    if (!isHost || !guessTimer || !guessTimerKey) return;
+    const timeout = setTimeout(() => {
+      submitMrWhiteGuess(t("results.timeUpNoGuess"));
+    }, guessTimer * 1000 + 1500);
+    return () => clearTimeout(timeout);
+  }, [isHost, guessTimer, guessTimerKey]);
 
   // Sort players by speaking order (and filter out eliminated players)
   const activePlayers = gameState.speakingOrder
@@ -139,6 +162,12 @@ export const Results = () => {
               </p>
             )}
 
+          {guessTimeLeft !== null && (
+            <div className="mt-4">
+              <CountdownBar timeLeft={guessTimeLeft} total={guessTimer} />
+            </div>
+          )}
+
           {isMrWhiteGuessing && currentPlayerGotEliminated && (
             <div className="mt-4 space-y-4">
               <p className="text-white/80">{t("results.finalGuess")}</p>
@@ -146,7 +175,9 @@ export const Results = () => {
                 <Input
                   value={guess}
                   onChange={(e) => setGuess(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleGuessSubmit(); }}
                   placeholder={t("results.enterGuess")}
+                  autoFocus
                   className="flex-1"
                 />
                 <Button

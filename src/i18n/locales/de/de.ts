@@ -21,6 +21,7 @@ export default {
       back: "Zurück",
       enterGameIdError: "Bitte gib eine Spiel-ID ein!",
       enterUsernameError: "Bitte gib deinen Benutzernamen ein!",
+      connecting: "Verbinde...",
     },
     gameSetup: {
       title: "Spiel Setup",
@@ -74,6 +75,7 @@ export default {
       inProgress: "Abstimmung läuft",
       voteToEliminate: "Zum Eliminieren abstimmen",
       submitVote: "Stimme abgeben",
+      tieRevote: "Gleichstand! Stimmt erneut ab zwischen: {{names}}",
     },
     results: {
       title: "Ergebnisse",
@@ -84,6 +86,7 @@ export default {
       theirWordWas: "Ihr Wort war:",
       finalGuess: "Gib deinen finalen Tipp ab!",
       enterGuess: "Deinen Tipp eingeben...",
+      timeUpNoGuess: "⏱ Zeit abgelaufen",
       guessRequired: "Bitte gib einen Tipp ein",
       continueGame: "Spiel fortsetzen",
     },
@@ -114,6 +117,8 @@ export default {
       gameHosted: "Spiel gehostet! Teile diese ID mit den Spielern: {{id}}",
       connected: "Mit dem Spiel verbunden!",
       hostClosedConnection: "Der Host hat die Verbindung geschlossen",
+      gameNotFound: "Kein Spiel mit dieser ID gefunden",
+      joinTimeout: "Verbindung zum Spiel fehlgeschlagen. Prüfe die ID oder versuche ein anderes Netzwerk/einen anderen Browser.",
     },
     wordPairs: wordPairs
   }

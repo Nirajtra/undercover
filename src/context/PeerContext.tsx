@@ -11,6 +11,7 @@ interface PeerContextType {
   connections: Record<string, DataConnection>;
   hostId: string | null;
   isHost: boolean;
+  isConnecting: boolean;
   hostGame: (username: string) => void;
   joinGame: (hostId: string, username: string) => void;
   sendGameState: (state: GameState) => void;
@@ -27,6 +28,7 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
   const [connections, setConnections] = useState<Record<string, DataConnection>>({});
   const [hostId, setHostId] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const { gameState, setGameState, addPlayer, removePlayer, submitMrWhiteGuess, submitVote, submitDescription } = useGame();
 
   useEffect(() => {
@@ -39,7 +41,8 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
 
     newPeer.on("error", (error) => {
       console.error("Peer error:", error);
-      toast.error(t("peer.connectionError"));
+      setIsConnecting(false);
+      toast.error(error.type === "peer-unavailable" ? t("peer.gameNotFound") : t("peer.connectionError"));
     });
 
     //HOST CONNECTION EVENTS
@@ -47,15 +50,26 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
       console.log("Incoming connection from:", conn.peer);
 
       // Monitor ICE connection state - [unexpected disconnect handling]
+      // "disconnected" is often a short blip (Wi-Fi, Safari) that recovers on its own,
+      // so only drop the player if it lasts; "failed" is final.
       const pc = conn.peerConnection;
-      pc.oniceconnectionstatechange = () => {
-        console.log("ICE state:", pc.iceConnectionState);
-        if (["disconnected", "failed"].includes(pc.iceConnectionState)) {
-          console.log("ICE disconnect detected");
-          removePlayer(conn.peer);
-          conn.close();
-        }
+      let disconnectTimer: ReturnType<typeof setTimeout> | undefined;
+      const dropPlayer = () => {
+        console.log("ICE disconnect detected");
+        removePlayer(conn.peer);
+        conn.close();
       };
+      if (pc) {
+        pc.oniceconnectionstatechange = () => {
+          console.log("ICE state:", pc.iceConnectionState);
+          clearTimeout(disconnectTimer);
+          if (pc.iceConnectionState === "failed") {
+            dropPlayer();
+          } else if (pc.iceConnectionState === "disconnected") {
+            disconnectTimer = setTimeout(dropPlayer, 8000);
+          }
+        };
+      }
       
       conn.on("open", () => {
         setConnections(prev => ({ ...prev, [conn.peer]: conn }));
@@ -125,7 +139,7 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const hostGame = (username: string) => {
-    if (!peer) return;
+    if (!peer || hostId) return;
     console.log("Hosting game with peer ID:", peer.id);
     setIsHost(true);
     setHostId(peer.id);
@@ -134,10 +148,30 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const joinGame = (hostId: string, username: string) => {
-    if (!peer) return;
-    
-    const conn = peer.connect(hostId);
+    // Ignore repeated clicks while a join is in flight or already done
+    if (!peer || isConnecting || connections[hostId]) return;
+    setIsConnecting(true);
+
+    const conn = peer.connect(hostId, { reliable: true, serialization: "json" });
     console.log("Joining game with peer ID:", peer.id);
+    let hasOpened = false;
+
+    // Give up if the connection never opens (blocked network, wrong ID, etc.)
+    const joinTimeout = setTimeout(() => {
+      if (!conn.open) {
+        console.log("Join timed out");
+        conn.close();
+        setIsConnecting(false);
+        toast.error(t("peer.joinTimeout"));
+      }
+    }, 15000);
+
+    conn.on("error", (error) => {
+      console.error("Connection error:", error);
+      clearTimeout(joinTimeout);
+      setIsConnecting(false);
+      toast.error(t("peer.connectionError"));
+    });
 
     const cleanupClient = () => {
       if (!peer.disconnected) {
@@ -150,6 +184,9 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
     
     //Client connection events
     conn.on("open", () => {
+      hasOpened = true;
+      clearTimeout(joinTimeout);
+      setIsConnecting(false);
       setConnections(prev => ({ ...prev, [hostId]: conn }));
       setHostId(hostId);
       conn.send({ type: "JOIN_GAME", username });
@@ -166,6 +203,10 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
 
     conn.on("close", () => {
       console.log("Connection closed with host");
+      clearTimeout(joinTimeout);
+      setIsConnecting(false);
+      // A join that never opened already showed its own error
+      if (!hasOpened) return;
       setConnections(prev => {
         const newConnections = { ...prev };
         delete newConnections[hostId];
@@ -207,6 +248,7 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
         connections,
         hostId,
         isHost,
+        isConnecting,
         hostGame,
         joinGame,
         sendGameState,
