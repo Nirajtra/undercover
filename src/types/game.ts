@@ -29,4 +29,5 @@ export type GameState = {
   winner?: string;
   mrWhiteGuess?: string;
   roleDistribution: RoleDistribution;
+  turnTimer?: number; // seconds per speaker turn, 0/undefined = no timer
 };

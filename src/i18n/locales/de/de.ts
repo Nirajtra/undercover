@@ -33,6 +33,12 @@ export default {
       atLeastFourPlayers: "Mindestens 4 Spieler sind erforderlich, um zu starten",
       maxPlayers: "Maximal 10 Spieler sind erlaubt!",
       startGame: "Spiel starten ({{count}} Spieler)",
+      turnTimer: "Zug-Timer",
+      noTimer: "Kein Zeitlimit",
+      seconds: "{{count}} Sekunden",
+      customTimer: "Benutzerdefiniert...",
+      customSecondsPlaceholder: "Sekunden",
+      customSecondsHint: "Zwischen {{min}} und {{max}} Sekunden",
     },
     gameLobby: {
       title: "Spiel-Lobby",
@@ -61,6 +67,8 @@ export default {
       waitingForData: "Warte auf Spieldaten...",
       yourId: "Deine ID:",
       cannotUseWordDirectly: "Du darfst das Wort nicht direkt verwenden!",
+      timeLeft: "{{seconds}}s",
+      timeUpSkipped: "⏱ Zeit abgelaufen",
     },
     voting: {
       inProgress: "Abstimmung läuft",

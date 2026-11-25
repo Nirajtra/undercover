@@ -34,6 +34,12 @@ export default {
         "Au moins 4 joueurs sont nécessaires pour commencer la partie",
       maxPlayers: "10 joueurs maximum autorisés !",
       startGame: "Lancer la partie ({{count}} joueurs)",
+      turnTimer: "Minuteur de tour",
+      noTimer: "Pas de limite de temps",
+      seconds: "{{count}} secondes",
+      customTimer: "Personnalisé...",
+      customSecondsPlaceholder: "Secondes",
+      customSecondsHint: "Entre {{min}} et {{max}} secondes",
     },
     gameLobby: {
       title: "Salon de jeu",
@@ -64,6 +70,8 @@ export default {
       waitingForData: "En attente des données de la partie...",
       yourId: "Votre ID :",
       cannotUseWordDirectly: "Vous ne pouvez pas utiliser le mot directement !",
+      timeLeft: "{{seconds}}s",
+      timeUpSkipped: "⏱ Temps écoulé",
     },
     voting: {
       inProgress: "Vote en cours",

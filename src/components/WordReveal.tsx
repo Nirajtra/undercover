@@ -8,6 +8,7 @@ import { useSound } from "@/context/SoundContext";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
+import { Timer } from "lucide-react";
 
 export const WordReveal = () => {
   const { gameState, setPhase, submitDescription, rerollWords } = useGame();
@@ -17,6 +18,44 @@ export const WordReveal = () => {
 
   const [description, setDescription] = useState("");
   const [revealed, setRevealed] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  const turnTimer = gameState.turnTimer ?? 0;
+  const currentSpeakerId = gameState.speakingOrder
+    ?.map(id => gameState.players.find(p => p.id === id))
+    .find(p => p && !p.isEliminated && !p.submittedDescription)?.id;
+
+  // Local countdown, restarted whenever the speaker changes
+  useEffect(() => {
+    if (!turnTimer || !currentSpeakerId) {
+      setTimeLeft(null);
+      return;
+    }
+    const endsAt = Date.now() + turnTimer * 1000;
+    setTimeLeft(turnTimer);
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0) clearInterval(interval);
+    }, 250);
+    return () => clearInterval(interval);
+  }, [currentSpeakerId, turnTimer]);
+
+  // When time runs out, the speaker submits whatever they typed
+  useEffect(() => {
+    if (timeLeft === 0 && currentSpeakerId === peer?.id && description.trim()) {
+      handleSubmitDescription();
+    }
+  }, [timeLeft]);
+
+  // The host skips the speaker if nothing arrived shortly after the timer ended
+  useEffect(() => {
+    if (!isHost || !turnTimer || !currentSpeakerId) return;
+    const timeout = setTimeout(() => {
+      submitDescription(currentSpeakerId, t("wordReveal.timeUpSkipped"));
+    }, turnTimer * 1000 + 1500);
+    return () => clearTimeout(timeout);
+  }, [isHost, currentSpeakerId, turnTimer]);
 
   useEffect(() => {
     if (gameState.currentRound === 1) {
@@ -34,6 +73,8 @@ export const WordReveal = () => {
 
   const handleSubmitDescription = () => {
     if (!description.trim()) return;
+
+    if (!currentPlayer) return;
 
     if (description.trim().toLowerCase() === currentPlayer.word.toLowerCase()) {
       toast.error(t("wordReveal.cannotUseWordDirectly"));
@@ -83,21 +124,23 @@ export const WordReveal = () => {
       <Card className="p-6 text-center glass-morphism">
         <div className="space-y-4">
           <p className="text-lg text-white">
-            {currentPlayer.role === "mrwhite"
-              ? t("wordReveal.youAre")
-              : currentPlayer.isEliminated ? t("wordReveal.yourWordWas") : t("wordReveal.yourWordIs")}{" "}
+            {currentPlayer.isEliminated ? t("wordReveal.yourWordWas") : t("wordReveal.yourWordIs")}{" "}
             <span
               onClick={() => setRevealed(r => !r)}
+              onMouseEnter={() => setRevealed(true)}
               onMouseLeave={() => setRevealed(false)}
               title={t("wordReveal.hoverToReveal", "Hover or tap to reveal")}
-              className={`font-bold text-primary inline-block cursor-pointer select-none rounded px-2 transition-all duration-200 hover:blur-none ${revealed ? "blur-none" : "blur-md bg-white/10"}`}
+              className={`font-bold inline-block cursor-pointer select-none rounded px-2 align-middle transition-colors duration-200 ${revealed ? "text-primary" : "min-w-[8rem] bg-white/20 text-white/40 tracking-widest"}`}
             >
-              {currentPlayer.role === "mrwhite" ? t("wordReveal.mrWhite") : currentPlayer.word}
+              {/* Hidden state renders a fixed-width placeholder so word length and color don't leak */}
+              {revealed
+                ? (currentPlayer.role === "mrwhite" ? t("wordReveal.mrWhite") : currentPlayer.word)
+                : "••••••"}
             </span>
           </p>
           <p className="text-xs text-white/50">{t("wordReveal.hoverToReveal", "Hover or tap to reveal")}</p>
           <p className="text-sm text-white/70">
-            {currentPlayer.role === "mrwhite"
+            {currentPlayer.role === "mrwhite" && revealed
               ? (
                 <>
                   {t("wordReveal.listenCarefully")}
@@ -118,6 +161,21 @@ export const WordReveal = () => {
 
       <div className="mt-8 space-y-4">
         <h3 className="text-xl font-semibold text-white text-center">{isMyTurn ? t("wordReveal.yourTurn") : t("wordReveal.speakingOrder")}</h3>
+
+        {timeLeft !== null && (
+          <div className="space-y-1">
+            <div className={`flex items-center justify-center gap-2 font-mono text-lg font-bold ${timeLeft <= 5 ? "text-red-500 animate-pulse" : "text-white"}`}>
+              <Timer className="h-5 w-5" />
+              {t("wordReveal.timeLeft", { seconds: timeLeft })}
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-white/10 overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ease-linear ${timeLeft <= 5 ? "bg-red-500" : "bg-primary"}`}
+                style={{ width: `${(timeLeft / turnTimer) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
 
         {isMyTurn && (
           <div className="relative flex h-10 w-full min-w-[200px]">

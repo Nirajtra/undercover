@@ -17,6 +17,7 @@ interface GameContextType {
   submitDescription: (playerId: string, description: string) => void;
   resetGame: () => void;
   updateRoleDistribution: (distribution: RoleDistribution) => void;
+  updateTurnTimer: (seconds: number) => void;
   checkGameEnd: (players: Player[]) => string | null;
   eliminatePlayer: (eliminatedId: string) => void;
   rerollWords: () => void;
@@ -35,6 +36,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     undercoverWord: "",
     mrWhiteGuess: undefined,
     roleDistribution: calculateDefaultDistribution(4),
+    turnTimer: 0,
   });
 
   const addPlayer = (name: string, id: string) => {
@@ -217,6 +219,9 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const submitDescription = (playerId: string, submittedDescription: string) => {
     setGameState((prev) => {
+      // Ignore late submissions (e.g. after the turn timer already skipped this player)
+      if (prev.players.find(p => p.id === playerId)?.submittedDescription) return prev;
+
       const updatedPlayers = prev.players.map(p =>
         p.id === playerId ? { ...p, submittedDescription } : p
       );
@@ -314,6 +319,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         undercoverWord: "",
         mrWhiteGuess: undefined,
         roleDistribution: prev.roleDistribution,
+        turnTimer: prev.turnTimer,
       };
     });
   };
@@ -322,6 +328,13 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     setGameState(prev => ({
       ...prev,
       roleDistribution: distribution
+    }));
+  };
+
+  const updateTurnTimer = (seconds: number) => {
+    setGameState(prev => ({
+      ...prev,
+      turnTimer: seconds
     }));
   };
 
@@ -339,6 +352,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         submitDescription,
         resetGame,
         updateRoleDistribution,
+        updateTurnTimer,
         checkGameEnd,
         eliminatePlayer,
         rerollWords,

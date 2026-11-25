@@ -33,6 +33,12 @@ export default {
       atLeastFourPlayers: "At least 4 players are required to start the game",
       maxPlayers: "Maximum 10 players allowed!",
       startGame: "Start Game ({{count}} players)",
+      turnTimer: "Turn Timer",
+      noTimer: "No time limit",
+      seconds: "{{count}} seconds",
+      customTimer: "Custom...",
+      customSecondsPlaceholder: "Seconds",
+      customSecondsHint: "Between {{min}} and {{max}} seconds",
     },
     gameLobby: {
       title: "Game Lobby",
@@ -61,6 +67,8 @@ export default {
       waitingForData: "Waiting for game data...",
       yourId: "Your ID:",
       cannotUseWordDirectly: "You can't use the word directly!",
+      timeLeft: "{{seconds}}s",
+      timeUpSkipped: "⏱ Time's up",
     },
     voting: {
       inProgress: "Voting in Progress",
