@@ -13,8 +13,6 @@ import { Button } from "@/components/ui/button";
 import { Volume2, VolumeX } from "lucide-react";
 import { SoundProvider, useSound } from "@/context/SoundContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { CommentHistory } from "@/components/shared/CommentHistory";
-
 const MuteToggle = () => {
   const { isMuted, toggleMute } = useSound();
   return (
@@ -37,14 +35,7 @@ const GameContent = () => {
     return <MultiplayerSetup />;
   }
 
-  return (
-    <>
-      <PhaseScreen />
-      <div className="mx-auto w-full max-w-3xl px-6">
-        <CommentHistory />
-      </div>
-    </>
-  );
+  return <PhaseScreen />;
 };
 
 const PhaseScreen = () => {
