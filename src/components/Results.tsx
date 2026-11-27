@@ -124,6 +124,7 @@ export const Results = () => {
     if (!readyToContinue || !eliminatedPlayer) return;
     toast(t("results.eliminatedPlayer", { name: eliminatedPlayer.name }), {
       description: `${t("results.theyWereA")} ${t(`roles.${eliminatedPlayer.role}`)}`,
+      duration: 5000,
     });
     if (isHost) handleContinue();
   }, [readyToContinue]);
