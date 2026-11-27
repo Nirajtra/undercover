@@ -175,6 +175,9 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const startGame = () => {
     setGameState((prev) => {
+      // A round is already running (e.g. start triggered twice)
+      if (prev.phase === "wordReveal") return prev;
+
       if (prev.currentRound === 0) {
         if (prev.players.length < 4) {
           toast.error(t("gameSetup.atLeastFourPlayers"));
@@ -364,6 +367,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const eliminatePlayer = (eliminatedId: string) => {
     setGameState((prev) => {
+      if (prev.phase !== "results") return prev;
       const updatedPlayers = prev.players.map(p =>
         p.id === eliminatedId ? { ...p, isEliminated: true, submittedDescription: undefined } : { ...p, submittedDescription: undefined }
       );

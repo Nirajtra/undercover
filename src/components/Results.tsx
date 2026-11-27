@@ -117,9 +117,22 @@ export const Results = () => {
     }
   };
 
+  // Once the result is known (and Mr. White has guessed, if needed) move on right away.
+  // A toast keeps the elimination visible since this screen is skipped past.
+  const readyToContinue = showEliminatedCard && !isMrWhiteGuessing;
+  useEffect(() => {
+    if (!readyToContinue || !eliminatedPlayer) return;
+    toast(t("results.eliminatedPlayer", { name: eliminatedPlayer.name }), {
+      description: `${t("results.theyWereA")} ${t(`roles.${eliminatedPlayer.role}`)}`,
+    });
+    if (isHost) handleContinue();
+  }, [readyToContinue]);
+
   const handleContinue = () => {
     eliminatePlayer(eliminatedPlayer?.id);
     setGameState((prev) => {
+      // Already moved on (e.g. continue triggered twice)
+      if (prev.phase !== "results") return prev;
       const gameWinner = checkGameEnd(prev.players);
 
       return {

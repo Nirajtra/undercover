@@ -1,9 +1,9 @@
 import { useGame } from "../context/GameContext";
 import { usePeer } from "../context/PeerContext";
 import { Button } from "@/components/ui/button";
-import { UserX } from "lucide-react";
 import { PlayerList } from "./shared/PlayerList";
 import { useTranslation } from "react-i18next";
+import { useEffect } from "react";
 
 export const GameLobby = () => {
   const { gameState, startGame } = useGame();
@@ -13,6 +13,11 @@ export const GameLobby = () => {
   const handleStartNextRound = () => {
     startGame();
   };
+
+  // The next round starts right away
+  useEffect(() => {
+    if (isHost) handleStartNextRound();
+  }, [isHost]);
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-8 animate-fade-in">

@@ -46,6 +46,12 @@ export const WordReveal = () => {
     return () => clearTimeout(timeout);
   }, [isHost, currentSpeakerId, turnTimer]);
 
+  // Once everyone has commented, voting starts right away
+  const allCommented = !!gameState.speakingOrder?.length && !currentSpeakerId;
+  useEffect(() => {
+    if (isHost && allCommented) setPhase("voting");
+  }, [isHost, allCommented]);
+
   useEffect(() => {
     if (gameState.currentRound === 1) {
       playSound("/sounds/word-reveal.mp3");
