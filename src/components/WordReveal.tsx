@@ -195,7 +195,8 @@ export const WordReveal = () => {
       <div className="mt-8 space-y-4">
         <h3 className="text-xl font-semibold text-white text-center">{isMyTurn ? t("wordReveal.yourTurn") : t("wordReveal.speakingOrder")}</h3>
 
-        {timeLeft !== null && <CountdownBar timeLeft={timeLeft} total={turnTimer} />}
+        {/* Only the player whose turn it is sees their countdown */}
+        {isMyTurn && timeLeft !== null && <CountdownBar timeLeft={timeLeft} total={turnTimer} />}
 
         {/* Everyone can write right away; it's revealed when their turn comes */}
         {canWrite && !isMyTurn && (
