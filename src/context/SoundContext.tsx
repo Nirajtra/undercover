@@ -30,7 +30,7 @@ export const SoundProvider = ({ children }: { children: React.ReactNode }) => {
   const audioCache = new Map<string, HTMLAudioElement>();
 
   useEffect(() => {
-    const soundsToPreload = ["/submit-vote.wav", "/new-page.mp3", "/click-sound.mp3"];
+    const soundsToPreload = ["/sounds/submit-vote.wav", "/sounds/new-page.mp3", "/sounds/click-sound.mp3"];
     soundsToPreload.forEach((src) => {
       const audio = new Audio(src);
       audio.preload = "auto"; 

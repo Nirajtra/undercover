@@ -173,6 +173,18 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
       toast.error(t("peer.connectionError"));
     });
 
+    // Log how far the direct connection gets; "failed" means the network blocks it,
+    // so tell the player right away instead of waiting for the timeout
+    conn.on("iceStateChanged", (state) => {
+      console.log("Join ICE state:", state);
+      if (state === "failed" && !hasOpened) {
+        clearTimeout(joinTimeout);
+        conn.close();
+        setIsConnecting(false);
+        toast.error(t("peer.joinTimeout"));
+      }
+    });
+
     const cleanupClient = () => {
       if (!peer.disconnected) {
         console.log("Disconnecting peer");
