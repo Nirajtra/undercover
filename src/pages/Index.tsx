@@ -66,12 +66,13 @@ const PhaseScreen = () => {
 const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent via-secondary to-accent text-white">
-      <div className="container mx-auto px-4 py-3">
+      <div className="w-full px-4 py-3">
         <SoundProvider>
           <GameProvider>
             <PeerProvider>
-              <div className="mx-auto flex max-w-4xl flex-col gap-4">
-                <div className="flex justify-end gap-2">
+              {/* Full width here; each screen sets its own max width (the discussion table can use it all) */}
+              <div className="flex w-full flex-col gap-4">
+                <div className="mx-auto flex w-full max-w-4xl justify-end gap-2">
                   <MuteToggle />
                   <LanguageSwitcher />
                 </div>

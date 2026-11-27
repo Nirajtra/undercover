@@ -71,6 +71,11 @@ export default {
       timeLeft: "{{seconds}}s",
       timeUpSkipped: "⏱ Zeit abgelaufen",
       commentsSoFar: "Bisherige Kommentare",
+      writeEarly: "Schreib deinen Kommentar jetzt — er wird gezeigt, wenn du dran bist.",
+      commentQueued: "Bereit: \"{{comment}}\" — wird gezeigt, wenn du dran bist. Erneut senden, um ihn zu ändern.",
+      changeComment: "Kommentar ändern...",
+      lastEliminated: "{{name}} wurde letzte Runde eliminiert — war",
+      duplicateComment: "Dieser Kommentar wurde in diesem Spiel schon verwendet. Versuch etwas anderes!",
     },
     voting: {
       inProgress: "Abstimmung läuft",
@@ -122,6 +127,7 @@ export default {
       role: "Rolle",
       round: "Runde {{number}}",
       out: "raus",
+      outAs: "raus · {{role}}",
     },
     peer: {
       connectionError: "Verbindungsfehler aufgetreten",

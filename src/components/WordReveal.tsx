@@ -12,9 +12,10 @@ import { useCountdown } from "@/hooks/use-countdown";
 import { CountdownBar } from "./shared/CountdownBar";
 import { RoundTable } from "./shared/RoundTable";
 import { RoundRecord } from "@/types/game";
+import { isDuplicateComment } from "@/lib/comments";
 
 export const WordReveal = () => {
-  const { gameState, setPhase, submitDescription, rerollWords } = useGame();
+  const { gameState, setPhase, submitDescription, timeoutSpeaker, rerollWords } = useGame();
   const { peer, isHost, sendToHost } = usePeer();
   const { playSound } = useSound();
   const { t } = useTranslation();
@@ -38,10 +39,11 @@ export const WordReveal = () => {
   }, [timeLeft]);
 
   // The host skips the speaker if nothing arrived shortly after the timer ended
+  // (a comment they wrote early is used instead of skipping)
   useEffect(() => {
     if (!isHost || !turnTimer || !currentSpeakerId) return;
     const timeout = setTimeout(() => {
-      submitDescription(currentSpeakerId, t("wordReveal.timeUpSkipped"));
+      timeoutSpeaker(currentSpeakerId, t("wordReveal.timeUpSkipped"));
     }, turnTimer * 1000 + 1500);
     return () => clearTimeout(timeout);
   }, [isHost, currentSpeakerId, turnTimer]);
@@ -73,6 +75,11 @@ export const WordReveal = () => {
 
     if (description.trim().toLowerCase() === currentPlayer.word.toLowerCase()) {
       toast.error(t("wordReveal.cannotUseWordDirectly"));
+      return;
+    }
+
+    if (isDuplicateComment(gameState, currentPlayer.id, description)) {
+      toast.error(t("wordReveal.duplicateComment"));
       return;
     }
 
@@ -112,6 +119,12 @@ export const WordReveal = () => {
   const currentSpeakerIndex = gameState.speakingOrder ? speakingOrderPlayers.findIndex(p => !p.submittedDescription) : 0;
   const myIndex = gameState.speakingOrder ? speakingOrderPlayers.findIndex(p => p.id === currentPlayer.id) : 0;
   const isMyTurn = gameState.speakingOrder && currentSpeakerIndex === myIndex;
+  const canWrite = !currentPlayer.isEliminated && myIndex !== -1 && !currentPlayer.submittedDescription;
+
+  // Who went out last round, and what they were
+  const lastEliminated = gameState.currentRound >= 2
+    ? gameState.players.find(p => p.id === gameState.lastEliminatedId && p.isEliminated)
+    : undefined;
 
   // From round 2 on, show this game's earlier rounds next to the live current round
   const gameNumber = gameState.gameNumber ?? 1;
@@ -131,6 +144,12 @@ export const WordReveal = () => {
   const main = (
     <div className="space-y-4">
       <h2 className="text-2xl font-bold text-center mb-4 text-white">{currentPlayer.isEliminated ? t("wordReveal.titleEliminated") : t("wordReveal.titleDiscussion")}</h2>
+      {lastEliminated && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/15 px-4 py-3 text-center text-white">
+          {t("wordReveal.lastEliminated", { name: lastEliminated.name })}{" "}
+          <span className="font-bold text-primary">{t(`roles.${lastEliminated.role}`)}</span>
+        </div>
+      )}
       <Card className="p-6 text-center glass-morphism">
         <div className="space-y-4">
           <div className="space-y-2">
@@ -178,14 +197,23 @@ export const WordReveal = () => {
 
         {timeLeft !== null && <CountdownBar timeLeft={timeLeft} total={turnTimer} />}
 
-        {isMyTurn && (
+        {/* Everyone can write right away; it's revealed when their turn comes */}
+        {canWrite && !isMyTurn && (
+          <p className="text-center text-sm text-white/70">
+            {currentPlayer.pendingDescription
+              ? t("wordReveal.commentQueued", { comment: currentPlayer.pendingDescription })
+              : t("wordReveal.writeEarly")}
+          </p>
+        )}
+
+        {canWrite && (
           <div className="relative flex h-10 w-full min-w-[200px]">
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, 100))}
               onKeyDown={(e) => { if (e.key === "Enter") handleSubmitDescription(); }}
               autoFocus
-              placeholder={t("wordReveal.enterWordOrPhrase")}
+              placeholder={currentPlayer.pendingDescription ? t("wordReveal.changeComment") : t("wordReveal.enterWordOrPhrase")}
               maxLength={25}
               className="peer h-full w-full rounded-[7px] border px-3 py-2.5 pr-20 text-sm font-normal outline-none transition-all"
             />
@@ -241,7 +269,7 @@ export const WordReveal = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto p-6 animate-fade-in grid gap-6 md:grid-cols-[minmax(0,1fr)_28rem] md:items-start">
+    <div className="w-full mx-auto p-6 animate-fade-in grid gap-6 md:grid-cols-[minmax(0,1fr)_28rem] md:items-start">
       {/* Left on desktop, below the main content on mobile */}
       <div className="order-last md:order-first space-y-2 md:sticky md:top-4">
         <h3 className="text-lg font-semibold text-white">{t("wordReveal.commentsSoFar")}</h3>

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { calculateDefaultDistribution } from "../config/roleDistribution";
 import { useTranslation } from "react-i18next";
 import { shuffle } from "@/lib/utils";
+import { isDuplicateComment } from "@/lib/comments";
 
 interface GameContextType {
   gameState: GameState;
@@ -16,6 +17,7 @@ interface GameContextType {
   closeVoting: () => void;
   submitMrWhiteGuess: (guess: string) => void;
   submitDescription: (playerId: string, description: string) => void;
+  timeoutSpeaker: (playerId: string, fallback: string) => void;
   resetGame: () => void;
   updateRoleDistribution: (distribution: RoleDistribution) => void;
   updateTurnTimer: (seconds: number) => void;
@@ -78,8 +80,9 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       const player = prev.players.find(p => p.id === id);
       if (!player) return prev;
 
-      const newPlayers = prev.players.filter(p => p.id !== id);
       const newSpeakingOrder = prev.speakingOrder?.filter(s => s !== id);
+      // If the leaver was speaking, the next players' early comments may now be due
+      const newPlayers = revealDueComments(prev.players.filter(p => p.id !== id), newSpeakingOrder);
 
       if (prev.phase !== "setup") {
         const gameEnd = checkGameEnd(newPlayers);
@@ -100,6 +103,26 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         speakingOrder: newSpeakingOrder,
       };
     });
+  };
+
+  // The current speaker is the first alive player in speaking order without a revealed comment
+  const getCurrentSpeaker = (players: Player[], speakingOrder?: string[]) =>
+    speakingOrder
+      ?.map(id => players.find(p => p.id === id))
+      .find(p => p && !p.isEliminated && !p.submittedDescription);
+
+  // Reveal early-written comments, in speaking order, for every speaker whose turn has come
+  const revealDueComments = (players: Player[], speakingOrder?: string[]) => {
+    let updated = players;
+    let speaker = getCurrentSpeaker(updated, speakingOrder);
+    while (speaker?.pendingDescription) {
+      const id = speaker.id;
+      updated = updated.map(p =>
+        p.id === id ? { ...p, submittedDescription: p.pendingDescription, pendingDescription: undefined } : p
+      );
+      speaker = getCurrentSpeaker(updated, speakingOrder);
+    }
+    return updated;
   };
 
   const generateSpeakingOrder = (players: Player[]) => {
@@ -148,6 +171,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       ...player,
       word: player.role === "mrwhite" ? "" : player.role === "undercover" ? undercoverWord : majorityWord,
       submittedDescription: undefined,
+      pendingDescription: undefined,
     }));
 
     return {
@@ -271,13 +295,43 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     }));
   };
 
-  const submitDescription = (playerId: string, submittedDescription: string) => {
+  // Players may write before their turn: the comment is held as pending and revealed
+  // (in speaking order) once their turn comes.
+  const submitDescription = (playerId: string, description: string) => {
     setGameState((prev) => {
       // Ignore late submissions (e.g. after the turn timer already skipped this player)
       if (prev.players.find(p => p.id === playerId)?.submittedDescription) return prev;
+      // Every comment in a game must be unique
+      if (isDuplicateComment(prev, playerId, description)) return prev;
 
-      const updatedPlayers = prev.players.map(p =>
-        p.id === playerId ? { ...p, submittedDescription } : p
+      const isTheirTurn = getCurrentSpeaker(prev.players, prev.speakingOrder)?.id === playerId;
+      const updatedPlayers = revealDueComments(
+        prev.players.map(p =>
+          p.id !== playerId ? p
+            : isTheirTurn ? { ...p, submittedDescription: description, pendingDescription: undefined }
+              : { ...p, pendingDescription: description }
+        ),
+        prev.speakingOrder,
+      );
+
+      const next = { ...prev, players: updatedPlayers };
+      return { ...next, history: snapshotRound(next) };
+    });
+  };
+
+  // Turn timer ran out: use the speaker's early comment if they wrote one, else the fallback
+  const timeoutSpeaker = (playerId: string, fallback: string) => {
+    setGameState((prev) => {
+      const speaker = getCurrentSpeaker(prev.players, prev.speakingOrder);
+      if (speaker?.id !== playerId) return prev;
+
+      const updatedPlayers = revealDueComments(
+        prev.players.map(p =>
+          p.id === playerId
+            ? { ...p, submittedDescription: p.pendingDescription || fallback, pendingDescription: undefined }
+            : p
+        ),
+        prev.speakingOrder,
       );
 
       const next = { ...prev, players: updatedPlayers };
@@ -369,7 +423,9 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     setGameState((prev) => {
       if (prev.phase !== "results") return prev;
       const updatedPlayers = prev.players.map(p =>
-        p.id === eliminatedId ? { ...p, isEliminated: true, submittedDescription: undefined } : { ...p, submittedDescription: undefined }
+        p.id === eliminatedId
+          ? { ...p, isEliminated: true, submittedDescription: undefined, pendingDescription: undefined }
+          : { ...p, submittedDescription: undefined, pendingDescription: undefined }
       );
 
       return {
@@ -407,7 +463,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
   const resetGame = () => {
     setGameState((prev) => {
-      const players = prev.players.map(p => ({ ...p, isEliminated: false, submittedDescription: undefined }));
+      const players = prev.players.map(p => ({ ...p, isEliminated: false, submittedDescription: undefined, pendingDescription: undefined }));
       return {
         players: players,
         phase: "setup",
@@ -450,6 +506,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         closeVoting,
         submitMrWhiteGuess,
         submitDescription,
+        timeoutSpeaker,
         resetGame,
         updateRoleDistribution,
         updateTurnTimer,

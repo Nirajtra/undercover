@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { isDuplicateComment } from "@/lib/comments";
 import { Peer, DataConnection } from "peerjs";
 import { useGame } from "./GameContext";
 import { toast } from "sonner";
@@ -30,6 +31,9 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
   const [isHost, setIsHost] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const { gameState, setGameState, addPlayer, removePlayer, submitMrWhiteGuess, submitVote, submitDescription } = useGame();
+  // Connection handlers are registered once, so they read the latest state through this ref
+  const gameStateRef = useRef(gameState);
+  gameStateRef.current = gameState;
 
   useEffect(() => {
     const newPeer = new Peer();
@@ -111,6 +115,11 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
             break;
           case "SUBMIT_DESCRIPTION":
             console.debug("Received description:", data);
+            // Only the host sees early comments, so it alone can catch every duplicate
+            if (isDuplicateComment(gameStateRef.current, data.playerId, data.description)) {
+              conn.send({ type: "COMMENT_REJECTED", reason: "duplicate" });
+              break;
+            }
             submitDescription(data.playerId, data.description);
             break;
           case "MR_WHITE_GUESS":
@@ -210,6 +219,8 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
       if (data.type === "GAME_STATE") {
         console.debug("Setting received game state:", data.state);
         setGameState(data.state);
+      } else if (data.type === "COMMENT_REJECTED") {
+        toast.error(t("wordReveal.duplicateComment"));
       }
     });
 
@@ -233,7 +244,14 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
   const sendGameState = (state: GameState) => {
     console.debug("Sending game state to all connections:", state);
     Object.values(connections).forEach(conn => {
-      conn.send({ type: "GAME_STATE", state });
+      // Each player only receives their own not-yet-revealed comment
+      const playerState = {
+        ...state,
+        players: state.players.map(p =>
+          p.id === conn.peer || !p.pendingDescription ? p : { ...p, pendingDescription: undefined }
+        ),
+      };
+      conn.send({ type: "GAME_STATE", state: playerState });
     });
   };
 

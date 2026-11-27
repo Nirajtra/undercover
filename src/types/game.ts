@@ -12,7 +12,8 @@ export type Player = {
   role?: PlayerRole;
   isEliminated?: boolean;
   score?: number;
-  submittedDescription?: string;
+  submittedDescription?: string; // revealed comment for this round
+  pendingDescription?: string; // written early; held by the host until this player's turn
 };
 
 // Snapshot of one round's comments, taken when voting starts

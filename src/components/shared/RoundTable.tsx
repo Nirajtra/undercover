@@ -37,7 +37,19 @@ export const RoundTable = ({
         <tbody>
           {[...players.entries()].map(([id, player]) => (
             <tr key={id} className={`border-t border-white/10 ${id === highlightPlayerId ? "bg-primary/10" : ""}`}>
-              <td className="px-3 py-2 text-white whitespace-nowrap">{player.name}</td>
+              <td className="px-3 py-2 text-white whitespace-nowrap">
+                {player.name}
+                {/* Once someone is voted out their role is public, so show it next to their name */}
+                {!showRoles && player.role && sortedRounds.some(r => r.eliminatedId === id) && (
+                  <span
+                    className={`ml-2 rounded px-1.5 py-0.5 text-xs font-semibold ${
+                      player.role === "civilian" ? "bg-white/10 text-white/70" : "bg-red-500/30 text-red-200"
+                    }`}
+                  >
+                    {t(`roles.${player.role}`)}
+                  </span>
+                )}
+              </td>
               {showRoles && (
                 <td className="px-3 py-2 text-white/70 whitespace-nowrap">
                   {player.role ? t(`roles.${player.role}`) : "—"}
@@ -45,12 +57,13 @@ export const RoundTable = ({
               )}
               {sortedRounds.map(r => {
                 const entry = r.entries.find(e => e.playerId === id);
+                const role = r.eliminatedId === id ? (entry?.role ?? player.role) : undefined;
                 return (
-                  <td key={r.round} className="px-3 py-2 text-white/80">
+                  <td key={r.round} className="px-3 py-2 text-white/80 min-w-[7rem] break-words">
                     {entry ? (entry.text || "—") : <span className="text-white/30">·</span>}
                     {r.eliminatedId === id && (
-                      <span className="ml-2 rounded bg-red-500/30 px-1.5 py-0.5 text-xs text-red-300 whitespace-nowrap">
-                        {t("history.out")}
+                      <span className="ml-2 inline-block rounded bg-red-500/30 px-1.5 py-0.5 text-xs text-red-300 whitespace-nowrap">
+                        {role ? t("history.outAs", { role: t(`roles.${role}`) }) : t("history.out")}
                       </span>
                     )}
                   </td>

@@ -16,7 +16,6 @@ interface PlayerListProps {
   lastEliminatedId?: string;
   showScores?: boolean;
   tieBreakerPlayers?: string[];
-  alwaysShowVotes?: boolean; // show votes even before the current player has voted
   allPlayers?: Player[]; // for voter names when `players` is filtered (e.g. tie re-vote)
 }
 
@@ -31,7 +30,6 @@ export const PlayerList = ({
   lastEliminatedId,
   showScores,
   tieBreakerPlayers = [],
-  alwaysShowVotes,
   allPlayers,
 }: PlayerListProps) => {
   const { playSound } = useSound();
@@ -99,7 +97,10 @@ export const PlayerList = ({
   };
 
   const hasCurrentPlayerVoted = currentPlayerId && votingResults?.[currentPlayerId];
-  const isCurrentPlayerEliminated = !players.some(player => player.id === currentPlayerId);
+  // With a filtered list (tie re-vote) "not in the list" doesn't mean eliminated, so check everyone
+  const isCurrentPlayerEliminated = allPlayers
+    ? !!allPlayers.find(p => p.id === currentPlayerId)?.isEliminated
+    : !players.some(player => player?.id === currentPlayerId);
 
   const filteredEliminatedPlayers = !showEliminated ? players.filter(p => !p.isEliminated) : players;
   const displayPlayers = speakingOrder ? players : filteredEliminatedPlayers;
@@ -119,7 +120,7 @@ export const PlayerList = ({
             if (!speakingOrder && currentPlayerId && !hasCurrentPlayerVoted && player.id === currentPlayerId) return null;
 
             const votes = getVotesForPlayer(player.id);
-            const showVotes = (alwaysShowVotes || hasCurrentPlayerVoted || isCurrentPlayerEliminated) && votes.length > 0;
+            const showVotes = (hasCurrentPlayerVoted || isCurrentPlayerEliminated) && votes.length > 0;
             const isLastEliminated = player.id === lastEliminatedId;
             const isCurrentSpeaker = speakingOrder && index === currentSpeakerIndex;
             const isHighlighted = highlightedPlayer === player.id;

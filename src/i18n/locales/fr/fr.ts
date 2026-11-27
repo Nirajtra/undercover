@@ -74,6 +74,11 @@ export default {
       timeLeft: "{{seconds}}s",
       timeUpSkipped: "⏱ Temps écoulé",
       commentsSoFar: "Commentaires jusqu'ici",
+      writeEarly: "Écrivez votre commentaire maintenant — il sera révélé à votre tour.",
+      commentQueued: "Prêt : \"{{comment}}\" — révélé à votre tour. Renvoyez pour le modifier.",
+      changeComment: "Modifier votre commentaire...",
+      lastEliminated: "{{name}} a été éliminé au tour précédent — c'était un",
+      duplicateComment: "Ce commentaire a déjà été utilisé dans cette partie. Essayez autre chose !",
     },
     voting: {
       inProgress: "Vote en cours",
@@ -125,6 +130,7 @@ export default {
       role: "Rôle",
       round: "Manche {{number}}",
       out: "éliminé",
+      outAs: "éliminé · {{role}}",
     },
     peer: {
       connectionError: "Une erreur de connexion est survenue",

@@ -129,7 +129,6 @@ export const VotingScreen = () => {
         allPlayers={gameState.players}
         votingResults={gameState.votingResults}
         currentPlayerId={peer?.id}
-        alwaysShowVotes
       />
     );
   }
@@ -144,7 +143,6 @@ export const VotingScreen = () => {
         allPlayers={gameState.players}
         votingResults={gameState.votingResults}
         currentPlayerId={peer?.id}
-        alwaysShowVotes
       />
 
       {!hasVoted && (
