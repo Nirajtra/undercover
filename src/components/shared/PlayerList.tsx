@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, UserX } from "lucide-react";
+import { RoleBadge } from "./RoleBadge";
+import { ThumbsUp, Users, UserX } from "lucide-react";
 import { Player } from "../../types/game";
 import { useEffect, useState } from "react";
 import { useSound } from "@/context/SoundContext";
@@ -111,7 +112,7 @@ export const PlayerList = ({
   const currentSpeakerIndex = speakingOrder ? displayPlayers.findIndex(p => !p.submittedDescription) : 0;
 
   return (
-    <Card className="p-6 glass-morphism">
+    <Card className="p-6 glass-morphism hud-corners">
       <div className="space-y-4">
         <div className="flex items-center gap-2 text-white/90 text-lg">
           <Users className="h-5 w-5" />
@@ -135,9 +136,9 @@ export const PlayerList = ({
                   flex items-center gap-3 p-3 rounded-lg transition-all duration-200
                   ${onPlayerClick ? 'cursor-pointer' : ''}
                   ${selectedPlayer === player.id
-                    ? 'bg-primary/20 border border-primary/30'
+                    ? 'bg-neon-indigo/15 border border-neon-indigo/40'
                     : isHighlighted
-                      ? 'bg-red-500/30 border-2 border-red-500'
+                      ? 'bg-neon-mrwhite/20 border-2 border-neon-mrwhite shadow-[0_0_16px_rgba(255,51,102,0.5)]'
                       : 'bg-white/5 hover:bg-white/10'
                   }
                   ${isLastEliminated && !votingResults ? 'border-2 border-blue-500' : ''}
@@ -150,7 +151,7 @@ export const PlayerList = ({
                 {speakingOrder && (
                   <div className={`
                     w-8 h-8 rounded-full flex items-center justify-center
-                    ${isCurrentSpeaker ? 'bg-primary' : 'bg-white/10'}
+                    ${isCurrentSpeaker ? 'bg-gradient-to-br from-blue-600 to-cyan-500 animate-ring-pulse' : 'bg-white/10'}
                     ${isCurrentSpeaker ? 'text-white' : 'text-white/80'}
                   `}>
                     {index + 1}
@@ -158,10 +159,10 @@ export const PlayerList = ({
                 )}
                 <div className="flex-1 flex items-center justify-between">
                   <div>
-                    <span className={`text-lg block max-w-[250px] truncate ${isCurrentSpeaker ? 'text-primary font-bold' : 'text-white'}`}>
+                    <span className={`text-lg block max-w-[250px] truncate ${isCurrentSpeaker ? 'text-neon-cyan font-bold' : 'text-white'}`}>
                       {player.name}
                       {player.id === currentPlayerId && (
-                        <span className="text-primary ml-2">{t("common.you")}</span>
+                        <span className="text-neon-cyan/80 ml-2">{t("common.you")}</span>
                       )}
                     </span>
                     {/* Text or phrase the player has submitted this round */}
@@ -177,7 +178,7 @@ export const PlayerList = ({
                         {votes.map((voterName, vIndex) => (
                           <span
                             key={vIndex}
-                            className="px-2 py-1 text-sm rounded-full bg-primary/60 text-white"
+                            className="px-2 py-0.5 text-sm rounded-full border border-neon-indigo/40 bg-neon-indigo/15 text-blue-100"
                           >
                             {voterName}
                           </span>
@@ -187,19 +188,21 @@ export const PlayerList = ({
                   </div>
                   {player.isEliminated && player.role && (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-white/70">{t(`roles.${player.role}`)}</span>
-                      <UserX className="h-5 w-5 text-red-500" />
+                      <RoleBadge role={player.role} />
+                      <UserX className="h-5 w-5 text-neon-mrwhite" />
                     </div>
                   )}
                 </div>
                 {/* Vote button on each row: used in VotingScreen.tsx */}
                 {onVote && player.id !== currentPlayerId && !player.isEliminated && (
                   <Button
-                    size="sm"
+                    size="icon"
                     onClick={(e) => { e.stopPropagation(); onVote(player.id); }}
-                    className="shrink-0 bg-primary hover:bg-primary/90"
+                    title={t("voting.vote")}
+                    aria-label={t("voting.vote")}
+                    className="shrink-0 rounded-full hover:scale-110 active:scale-90"
                   >
-                    {t("voting.vote")}
+                    <ThumbsUp className="h-4 w-4" />
                   </Button>
                 )}
                 {/* Scores Overview: used in GameSetup.tsx */}

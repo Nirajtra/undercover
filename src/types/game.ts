@@ -14,6 +14,7 @@ export type Player = {
   score?: number;
   submittedDescription?: string; // revealed comment for this round
   pendingDescription?: string; // written early; held by the host until this player's turn
+  pendingRejected?: string; // early comment dropped because someone else revealed it first
 };
 
 // Snapshot of one round's comments, taken when voting starts
@@ -39,6 +40,7 @@ export type GameState = {
   lastEliminatedId?: string;
   winner?: string;
   mrWhiteGuess?: string;
+  mrWhiteGuessCorrect?: boolean; // decided by the host, so clients don't need the secret word
   roleDistribution: RoleDistribution;
   turnTimer?: number; // seconds per speaker turn, 0/undefined = no timer
   tieCandidates?: string[]; // set during a re-vote: only these players can be voted for

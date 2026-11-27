@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState } from "react";
 import { GameState, Player, GamePhase, PlayerRole, RoleDistribution, RoundRecord } from "../types/game";
 import { toast } from "sonner";
-import { calculateDefaultDistribution } from "../config/roleDistribution";
+import { calculateDefaultDistribution, distributionMeetsLimits } from "../config/roleDistribution";
 import { useTranslation } from "react-i18next";
 import { shuffle } from "@/lib/utils";
-import { isDuplicateComment } from "@/lib/comments";
+import { isDuplicateComment, normalize } from "@/lib/comments";
 
 interface GameContextType {
   gameState: GameState;
@@ -22,7 +22,7 @@ interface GameContextType {
   updateRoleDistribution: (distribution: RoleDistribution) => void;
   updateTurnTimer: (seconds: number) => void;
   checkGameEnd: (players: Player[]) => string | null;
-  eliminatePlayer: (eliminatedId: string) => void;
+  continueAfterResults: () => void;
   rerollWords: () => void;
 }
 
@@ -82,28 +82,74 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
 
       const newSpeakingOrder = prev.speakingOrder?.filter(s => s !== id);
       // If the leaver was speaking, the next players' early comments may now be due
-      const newPlayers = revealDueComments(prev.players.filter(p => p.id !== id), newSpeakingOrder);
+      const newPlayers = revealDueComments(prev, prev.players.filter(p => p.id !== id), newSpeakingOrder);
+      let next: GameState = { ...prev, players: newPlayers, speakingOrder: newSpeakingOrder };
 
-      if (prev.phase !== "setup") {
-        const gameEnd = checkGameEnd(newPlayers);
-        if (gameEnd) {
-          return {
-            ...prev,
-            phase: "gameEnd",
-            winner: gameEnd,
-            players: newPlayers,
-            speakingOrder: newSpeakingOrder,
-          };
-        }
+      if (prev.phase === "setup") {
+        // Keep the role setup valid for the smaller group
+        return distributionMeetsLimits(prev.roleDistribution, newPlayers.length)
+          ? next
+          : { ...next, roleDistribution: calculateDefaultDistribution(newPlayers.length) };
       }
 
-      return {
-        ...prev,
-        players: newPlayers,
-        speakingOrder: newSpeakingOrder,
-      };
+      const winner = checkGameEnd(newPlayers);
+      if (winner) return endGame(next, winner);
+
+      if (prev.phase === "voting") {
+        // Drop the leaver's vote and votes cast for them (those voters vote again);
+        // then, if everyone left has voted, count the votes instead of waiting forever
+        const votingResults = Object.fromEntries(
+          Object.entries(prev.votingResults ?? {}).filter(([voter, target]) => voter !== id && target !== id)
+        );
+        const tieCandidates = prev.tieCandidates?.filter(c => c !== id);
+        next = { ...next, votingResults, tieCandidates: tieCandidates?.length ? tieCandidates : undefined };
+        const active = newPlayers.filter(p => !p.isEliminated);
+        if (active.length > 0 && active.every(p => p.id in votingResults)) return resolveVotes(next, votingResults);
+      }
+
+      // The player being voted out left before the result was handled: just move on
+      if (prev.phase === "results" && prev.lastEliminatedId === id) {
+        return finishResults(next);
+      }
+
+      return next;
     });
   };
+
+  // Points per winning player
+  const withScores = (players: Player[], winner: string) =>
+    players.map(p => {
+      let points = 0;
+      if (winner === "civilian" && p.role === "civilian") points = 2;
+      if ((winner === "undercover" || winner === "infiltrators") && p.role === "undercover") points = 10;
+      if ((winner === "mrwhite" || winner === "infiltrators") && p.role === "mrwhite") points = 6;
+      return { ...p, score: (p.score || 0) + points };
+    });
+
+  // The one place a game ends: sets the winner and awards points exactly once
+  const endGame = (state: GameState, winner: string): GameState => ({
+    ...state,
+    phase: "gameEnd",
+    winner,
+    players: withScores(state.players, winner),
+  });
+
+  // After a vote: the voted-out player is eliminated, then either the game ends or the next round starts
+  const finishResults = (prev: GameState): GameState => {
+    if (prev.phase !== "results") return prev;
+    const players = prev.players.map(p => ({
+      ...p,
+      isEliminated: p.id === prev.lastEliminatedId ? true : p.isEliminated,
+      submittedDescription: undefined,
+      pendingDescription: undefined,
+      pendingRejected: undefined,
+    }));
+    const next: GameState = { ...prev, players, votingResults: {} };
+    const winner = checkGameEnd(players);
+    return winner ? endGame(next, winner) : { ...next, phase: "discussion" };
+  };
+
+  const continueAfterResults = () => setGameState(finishResults);
 
   // The current speaker is the first alive player in speaking order without a revealed comment
   const getCurrentSpeaker = (players: Player[], speakingOrder?: string[]) =>
@@ -111,14 +157,22 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       ?.map(id => players.find(p => p.id === id))
       .find(p => p && !p.isEliminated && !p.submittedDescription);
 
-  // Reveal early-written comments, in speaking order, for every speaker whose turn has come
-  const revealDueComments = (players: Player[], speakingOrder?: string[]) => {
+  // Reveal early-written comments, in speaking order, for every speaker whose turn has come.
+  // An early comment someone else revealed first is dropped instead, and that player has to
+  // write a new one (they're told via `pendingRejected`).
+  const revealDueComments = (state: GameState, players: Player[], speakingOrder?: string[]) => {
     let updated = players;
     let speaker = getCurrentSpeaker(updated, speakingOrder);
     while (speaker?.pendingDescription) {
-      const id = speaker.id;
+      const { id, pendingDescription } = speaker;
+      if (isDuplicateComment({ ...state, players: updated }, pendingDescription)) {
+        updated = updated.map(p =>
+          p.id === id ? { ...p, pendingDescription: undefined, pendingRejected: pendingDescription } : p
+        );
+        break;
+      }
       updated = updated.map(p =>
-        p.id === id ? { ...p, submittedDescription: p.pendingDescription, pendingDescription: undefined } : p
+        p.id === id ? { ...p, submittedDescription: pendingDescription, pendingDescription: undefined } : p
       );
       speaker = getCurrentSpeaker(updated, speakingOrder);
     }
@@ -172,6 +226,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       word: player.role === "mrwhite" ? "" : player.role === "undercover" ? undercoverWord : majorityWord,
       submittedDescription: undefined,
       pendingDescription: undefined,
+      pendingRejected: undefined,
     }));
 
     return {
@@ -238,6 +293,11 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
           undercoverWord,
           currentRound: 1,
           mrWhiteGuess: undefined,
+          mrWhiteGuessCorrect: undefined,
+          winner: undefined,
+          lastEliminatedId: undefined,
+          votingResults: {},
+          tieCandidates: undefined,
           gameNumber: (prev.gameNumber ?? 0) + 1,
         };
       } else {
@@ -249,6 +309,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
           tieCandidates: undefined,
           currentRound: prev.currentRound + 1,
           mrWhiteGuess: undefined,
+          mrWhiteGuessCorrect: undefined,
         };
       }
     });
@@ -302,14 +363,15 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       // Ignore late submissions (e.g. after the turn timer already skipped this player)
       if (prev.players.find(p => p.id === playerId)?.submittedDescription) return prev;
       // Every comment in a game must be unique
-      if (isDuplicateComment(prev, playerId, description)) return prev;
+      if (isDuplicateComment(prev, description)) return prev;
 
       const isTheirTurn = getCurrentSpeaker(prev.players, prev.speakingOrder)?.id === playerId;
       const updatedPlayers = revealDueComments(
+        prev,
         prev.players.map(p =>
           p.id !== playerId ? p
-            : isTheirTurn ? { ...p, submittedDescription: description, pendingDescription: undefined }
-              : { ...p, pendingDescription: description }
+            : isTheirTurn ? { ...p, submittedDescription: description, pendingDescription: undefined, pendingRejected: undefined }
+              : { ...p, pendingDescription: description, pendingRejected: undefined }
         ),
         prev.speakingOrder,
       );
@@ -325,10 +387,15 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
       const speaker = getCurrentSpeaker(prev.players, prev.speakingOrder);
       if (speaker?.id !== playerId) return prev;
 
+      // An early comment someone else already revealed can't be used
+      const early = speaker.pendingDescription && !isDuplicateComment(prev, speaker.pendingDescription)
+        ? speaker.pendingDescription
+        : undefined;
       const updatedPlayers = revealDueComments(
+        prev,
         prev.players.map(p =>
           p.id === playerId
-            ? { ...p, submittedDescription: p.pendingDescription || fallback, pendingDescription: undefined }
+            ? { ...p, submittedDescription: early || fallback, pendingDescription: undefined, pendingRejected: undefined }
             : p
         ),
         prev.speakingOrder,
@@ -419,51 +486,28 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
-  const eliminatePlayer = (eliminatedId: string) => {
-    setGameState((prev) => {
-      if (prev.phase !== "results") return prev;
-      const updatedPlayers = prev.players.map(p =>
-        p.id === eliminatedId
-          ? { ...p, isEliminated: true, submittedDescription: undefined, pendingDescription: undefined }
-          : { ...p, submittedDescription: undefined, pendingDescription: undefined }
-      );
-
-      return {
-        ...prev,
-        players: updatedPlayers,
-        phase: "results",
-        lastEliminatedId: eliminatedId,
-      };
-    });
-  };
-
   const submitMrWhiteGuess = (guess: string) => {
     setGameState((prev) => {
       // Ignore a late guess arriving after the timer already ended the guess
-      if (prev.mrWhiteGuess) return prev;
+      if (prev.mrWhiteGuess || prev.phase !== "results") return prev;
 
-      if (guess.toLowerCase() === prev.majorityWord.toLowerCase()) {
-        return {
-          ...prev,
-          phase: "gameEnd",
-          winner: "mrwhite",
-          mrWhiteGuess: guess
-        };
-      } else {
-        const gameWinner = checkGameEnd(prev.players);
-        return {
-          ...prev,
-          phase: gameWinner ? "gameEnd" : "results",
-          winner: gameWinner || undefined,
-          mrWhiteGuess: guess
-        };
+      if (normalize(guess) === normalize(prev.majorityWord)) {
+        return endGame({ ...prev, mrWhiteGuess: guess, mrWhiteGuessCorrect: true }, "mrwhite");
       }
+
+      // Wrong guess: Mr. White is out, so check for a winner without them
+      // (counting them as alive could wrongly hand the win to Mr. White)
+      const next: GameState = { ...prev, mrWhiteGuess: guess, mrWhiteGuessCorrect: false };
+      const playersAfter = prev.players.map(p => (p.id === prev.lastEliminatedId ? { ...p, isEliminated: true } : p));
+      const winner = checkGameEnd(playersAfter);
+      // No winner yet: stay on the results screen, which shows the guess and then moves on
+      return winner ? endGame({ ...next, players: playersAfter }, winner) : next;
     });
   };
 
   const resetGame = () => {
     setGameState((prev) => {
-      const players = prev.players.map(p => ({ ...p, isEliminated: false, submittedDescription: undefined, pendingDescription: undefined }));
+      const players = prev.players.map(p => ({ ...p, isEliminated: false, submittedDescription: undefined, pendingDescription: undefined, pendingRejected: undefined }));
       return {
         players: players,
         phase: "setup",
@@ -511,7 +555,7 @@ export const GameProvider = ({ children }: { children: React.ReactNode }) => {
         updateRoleDistribution,
         updateTurnTimer,
         checkGameEnd,
-        eliminatePlayer,
+        continueAfterResults,
         rerollWords,
       }}
     >

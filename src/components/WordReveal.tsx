@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePeer } from "../context/PeerContext";
 import { PlayerList } from "./shared/PlayerList";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSound } from "@/context/SoundContext";
 import { Input } from "./ui/input";
 import { toast } from "sonner";
@@ -12,7 +12,9 @@ import { useCountdown } from "@/hooks/use-countdown";
 import { CountdownBar } from "./shared/CountdownBar";
 import { RoundTable } from "./shared/RoundTable";
 import { RoundRecord } from "@/types/game";
-import { isDuplicateComment } from "@/lib/comments";
+import { containsSecretWord, isDuplicateComment } from "@/lib/comments";
+import { Check, Send } from "lucide-react";
+import { useAttention } from "@/hooks/use-attention";
 
 export const WordReveal = () => {
   const { gameState, setPhase, submitDescription, timeoutSpeaker, rerollWords } = useGame();
@@ -63,6 +65,31 @@ export const WordReveal = () => {
   }, []);
 
   const currentPlayer = gameState.players.find(p => p.id === peer?.id);
+  const isMyTurn = !!currentPlayer && currentSpeakerId === currentPlayer.id;
+
+  // Someone revealed the same comment before this player's turn: their saved one was dropped
+  const pendingRejected = currentPlayer?.pendingRejected;
+  useEffect(() => {
+    if (pendingRejected) toast.error(t("wordReveal.savedCommentTaken", { comment: pendingRejected }));
+  }, [pendingRejected]);
+
+  // Your turn: flag the browser tab, and give a nudge if you haven't written anything yet
+  useAttention(isMyTurn);
+  useEffect(() => {
+    if (!isMyTurn) return;
+    playSound("/sounds/click-sound.mp3");
+    if (!currentPlayer?.pendingDescription) toast(t("wordReveal.yourTurn"), { duration: 3000 });
+  }, [isMyTurn]);
+
+  // The host rerolled the words: tell everyone their word changed
+  const myWord = currentPlayer?.word;
+  const previousWord = useRef(myWord);
+  useEffect(() => {
+    if (previousWord.current !== undefined && myWord !== previousWord.current && !isHost) {
+      toast.info(t("wordReveal.wordsRerolled"));
+    }
+    previousWord.current = myWord;
+  }, [myWord]);
 
   const handleStartVoting = () => {
     setPhase("voting");
@@ -73,12 +100,13 @@ export const WordReveal = () => {
 
     if (!currentPlayer) return;
 
-    if (description.trim().toLowerCase() === currentPlayer.word.toLowerCase()) {
+    // Blocks the word itself anywhere in the comment ("big apple" when the word is "apple")
+    if (containsSecretWord(description, currentPlayer.word)) {
       toast.error(t("wordReveal.cannotUseWordDirectly"));
       return;
     }
 
-    if (isDuplicateComment(gameState, currentPlayer.id, description)) {
+    if (isDuplicateComment(gameState, description)) {
       toast.error(t("wordReveal.duplicateComment"));
       return;
     }
@@ -92,7 +120,7 @@ export const WordReveal = () => {
         description: description.trim()
       });
     }
-    setDescription("");
+    // Text stays in the box so an early comment can still be edited and re-sent
   };
 
   if (!peer) {
@@ -116,15 +144,11 @@ export const WordReveal = () => {
     : [];
 
 
-  const currentSpeakerIndex = gameState.speakingOrder ? speakingOrderPlayers.findIndex(p => !p.submittedDescription) : 0;
-  const myIndex = gameState.speakingOrder ? speakingOrderPlayers.findIndex(p => p.id === currentPlayer.id) : 0;
-  const isMyTurn = gameState.speakingOrder && currentSpeakerIndex === myIndex;
+  const myIndex = speakingOrderPlayers.findIndex(p => p.id === currentPlayer.id);
+  const isSpectator = currentPlayer.role === "spectator";
   const canWrite = !currentPlayer.isEliminated && myIndex !== -1 && !currentPlayer.submittedDescription;
-
-  // Who went out last round, and what they were
-  const lastEliminated = gameState.currentRound >= 2
-    ? gameState.players.find(p => p.id === gameState.lastEliminatedId && p.isEliminated)
-    : undefined;
+  // The text in the box is exactly the early comment the host is holding
+  const isSaved = !!currentPlayer.pendingDescription && description.trim() === currentPlayer.pendingDescription;
 
   // From round 2 on, show this game's earlier rounds next to the live current round
   const gameNumber = gameState.gameNumber ?? 1;
@@ -143,26 +167,30 @@ export const WordReveal = () => {
 
   const main = (
     <div className="space-y-4">
-      <h2 className="text-2xl font-bold text-center mb-4 text-white">{currentPlayer.isEliminated ? t("wordReveal.titleEliminated") : t("wordReveal.titleDiscussion")}</h2>
-      {lastEliminated && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/15 px-4 py-3 text-center text-white">
-          {t("wordReveal.lastEliminated", { name: lastEliminated.name })}{" "}
-          <span className="font-bold text-primary">{t(`roles.${lastEliminated.role}`)}</span>
-        </div>
-      )}
-      <Card className="p-6 text-center glass-morphism">
+      <h2 className="text-2xl font-bold text-center mb-4 text-gradient">
+        {isSpectator ? t("wordReveal.titleSpectating") : currentPlayer.isEliminated ? t("wordReveal.titleEliminated") : t("wordReveal.titleDiscussion")}
+      </h2>
+      {isSpectator ? (
+        // Joined mid-game: nothing to reveal, they play from the next game
+        <Card className="p-6 text-center glass-morphism hud-corners text-white/80">
+          {t("wordReveal.spectatorInfo")}
+        </Card>
+      ) : (
+      <Card className="p-6 text-center glass-morphism hud-corners">
         <div className="space-y-4">
           <div className="space-y-2">
             <p className="text-lg text-white">
               {currentPlayer.isEliminated ? t("wordReveal.yourWordWas") : t("wordReveal.yourWordIs")}
             </p>
             {/* Fixed-size box: the hidden placeholder and the revealed word take the same space, so nothing shifts */}
+            {/* Mouse: hover reveals. Touch: tap toggles (touch also fires "enter", which used to
+                reveal and then immediately un-reveal on the same tap) */}
             <div
               onClick={() => setRevealed(r => !r)}
-              onMouseEnter={() => setRevealed(true)}
-              onMouseLeave={() => setRevealed(false)}
+              onPointerEnter={(e) => { if (e.pointerType === "mouse") setRevealed(true); }}
+              onPointerLeave={(e) => { if (e.pointerType === "mouse") setRevealed(false); }}
               title={t("wordReveal.hoverToReveal", "Hover or tap to reveal")}
-              className={`mx-auto flex h-12 w-full max-w-xs items-center justify-center rounded-lg px-3 text-xl font-bold cursor-pointer select-none transition-colors duration-200 ${revealed ? "bg-white/10 text-primary" : "bg-white/20 text-white/40 tracking-widest"}`}
+              className={`mx-auto flex h-12 w-full max-w-xs items-center justify-center rounded-lg px-3 text-xl font-bold cursor-pointer select-none transition-colors duration-200 ${revealed ? "bg-neon-cyan/10 border border-neon-cyan/40 text-neon-cyan [text-shadow:0_0_12px_rgba(34,229,255,0.7)]" : "bg-white/10 border border-white/10 text-white/40 tracking-widest"}`}
             >
               <span className="truncate">
                 {revealed
@@ -191,6 +219,7 @@ export const WordReveal = () => {
           </p>
         </div>
       </Card>
+      )}
 
       <div className="mt-8 space-y-4">
         <h3 className="text-xl font-semibold text-white text-center">{isMyTurn ? t("wordReveal.yourTurn") : t("wordReveal.speakingOrder")}</h3>
@@ -201,9 +230,7 @@ export const WordReveal = () => {
         {/* Everyone can write right away; it's revealed when their turn comes */}
         {canWrite && !isMyTurn && (
           <p className="text-center text-sm text-white/70">
-            {currentPlayer.pendingDescription
-              ? t("wordReveal.commentQueued", { comment: currentPlayer.pendingDescription })
-              : t("wordReveal.writeEarly")}
+            {currentPlayer.pendingDescription ? t("wordReveal.commentQueued") : t("wordReveal.writeEarly")}
           </p>
         )}
 
@@ -212,22 +239,28 @@ export const WordReveal = () => {
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, 100))}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSubmitDescription(); }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !isSaved) handleSubmitDescription(); }}
               autoFocus
-              placeholder={currentPlayer.pendingDescription ? t("wordReveal.changeComment") : t("wordReveal.enterWordOrPhrase")}
+              placeholder={t("wordReveal.enterWordOrPhrase")}
               maxLength={25}
-              className="peer h-full w-full rounded-[7px] border px-3 py-2.5 pr-20 text-sm font-normal outline-none transition-all"
+              className="peer h-full w-full rounded-[7px] border px-3 py-2.5 pr-12 text-sm font-normal outline-none transition-all"
             />
-            {description.trim() && (
-              <button
-                onClick={handleSubmitDescription}
-                type="button"
-                className="!absolute right-1 top-1 z-10 select-none rounded bg-primary hover:bg-primary/90 py-2 px-4 text-center align-middle text-xs font-bold uppercase text-white shadow-md shadow-primary/20 transition-all focus:opacity-[0.85] focus:shadow-none active:opacity-[0.85] active:shadow-none"
-                data-ripple-light="true"
-              >
-                {t("wordReveal.submit")}
-              </button>
-            )}
+            {/* Always-visible send button; shows a tick once the early comment is saved, and
+                turns back into send as soon as the text is edited, so it can be changed any time */}
+            <button
+              onClick={handleSubmitDescription}
+              type="button"
+              disabled={!description.trim() || isSaved}
+              title={isSaved ? t("wordReveal.commentSaved") : t("wordReveal.submit")}
+              aria-label={isSaved ? t("wordReveal.commentSaved") : t("wordReveal.submit")}
+              className={`!absolute right-1 top-1 z-10 flex h-8 w-9 items-center justify-center rounded text-white transition-all ${
+                isSaved
+                  ? "bg-neon-civilian/20 text-neon-civilian border border-neon-civilian/50 shadow-[0_0_10px_rgba(57,255,159,0.4)]"
+                  : "bg-gradient-to-r from-blue-600 to-cyan-500 shadow-[0_0_12px_rgba(79,107,255,0.5)] hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:shadow-none"
+              }`}
+            >
+              {isSaved ? <Check className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+            </button>
           </div>
         )}
 
@@ -274,8 +307,12 @@ export const WordReveal = () => {
     <div className="w-full p-6 animate-fade-in grid gap-6 lg:grid-cols-[minmax(0,1fr)_28rem_minmax(0,1fr)] lg:items-start">
       {/* Left on desktop, below the main content on mobile */}
       <div className="order-last min-w-0 space-y-2 lg:order-none lg:col-start-1 lg:row-start-1 lg:sticky lg:top-4">
-        <h3 className="text-lg font-semibold text-white">{t("wordReveal.commentsSoFar")}</h3>
-        <RoundTable rounds={roundTable} highlightPlayerId={currentSpeakerId} />
+        <RoundTable
+          rounds={roundTable}
+          highlightPlayerId={currentSpeakerId}
+          title={t("wordReveal.commentsSoFar")}
+          liveRound={gameState.currentRound}
+        />
       </div>
       <div className="w-full max-w-md mx-auto lg:max-w-none lg:col-start-2 lg:row-start-1">{main}</div>
     </div>

@@ -12,9 +12,11 @@ import { PlayerList } from "./shared/PlayerList";
 import { useTranslation } from "react-i18next";
 import { useCountdown } from "@/hooks/use-countdown";
 import { CountdownBar } from "./shared/CountdownBar";
+import { showEliminationToast } from "@/lib/eliminationToast";
+import { RoleBadge } from "./shared/RoleBadge";
 
 export const Results = () => {
-  const { gameState, setGameState, submitMrWhiteGuess, eliminatePlayer, checkGameEnd } = useGame();
+  const { gameState, submitMrWhiteGuess, continueAfterResults } = useGame();
   const { peer, isHost, sendToHost } = usePeer();
   const { playSound } = useSound();
   const [guess, setGuess] = useState("");
@@ -60,10 +62,12 @@ export const Results = () => {
       setTieBreakerPlayers(mostVotedPlayers);
 
       if (mostVotedPlayers.length > 1) {
-        setTimeout(() => {
+        // Let the tie-breaker animation play first
+        const timeout = setTimeout(() => {
           setShowEliminatedCard(true);
           playEliminationSound();
         }, 7000);
+        return () => clearTimeout(timeout);
       } else {
         setShowEliminatedCard(true);
         playEliminationSound();
@@ -73,7 +77,6 @@ export const Results = () => {
 
   const currentPlayerGotEliminated = eliminatedPlayer?.id === currentPlayer?.id;
   const isMrWhiteGuessing = eliminatedPlayer?.role === "mrwhite" && !gameState.mrWhiteGuess;
-  const canContinue = isHost && !isMrWhiteGuessing;
 
   // Mr. White gets double the turn timer for the final guess
   const guessTimer = (gameState.turnTimer ?? 0) * 2;
@@ -122,37 +125,18 @@ export const Results = () => {
   const readyToContinue = showEliminatedCard && !isMrWhiteGuessing;
   useEffect(() => {
     if (!readyToContinue || !eliminatedPlayer) return;
-    toast(t("results.eliminatedPlayer", { name: eliminatedPlayer.name }), {
-      description: `${t("results.theyWereA")} ${t(`roles.${eliminatedPlayer.role}`)}`,
-      duration: 5000,
-    });
-    if (isHost) handleContinue();
+    showEliminationToast(t, eliminatedPlayer.name, eliminatedPlayer.role);
+    if (isHost) continueAfterResults();
   }, [readyToContinue]);
-
-  const handleContinue = () => {
-    eliminatePlayer(eliminatedPlayer?.id);
-    setGameState((prev) => {
-      // Already moved on (e.g. continue triggered twice)
-      if (prev.phase !== "results") return prev;
-      const gameWinner = checkGameEnd(prev.players);
-
-      return {
-        ...prev,
-        phase: gameWinner ? "gameEnd" : "discussion",
-        winner: gameWinner || undefined,
-        votingResults: {},
-      };
-    });
-  };
 
   return (
     <div className="max-w-md mx-auto p-6 space-y-6 animate-fade-in">
-      <h2 className="text-2xl font-bold text-center mb-4 text-white">
+      <h2 className="text-2xl font-bold text-center mb-4 text-gradient">
         {t("results.title")}
       </h2>
 
       {showEliminatedCard && eliminatedPlayer && (
-        <Card className="p-6 text-center glass-morphism">
+        <Card className="p-6 text-center glass-morphism hud-corners">
           <h3 className="text-xl font-bold mb-4 text-white">
             {currentPlayerGotEliminated
               ? t("results.eliminatedYou")
@@ -164,9 +148,7 @@ export const Results = () => {
                 ? "results.youWereA"
                 : "results.theyWereA",
             )}{" "}
-            <span className="font-bold text-primary">
-              {t(`roles.${eliminatedPlayer.role}`)}
-            </span>
+            <RoleBadge role={eliminatedPlayer.role} />
           </p>
           {eliminatedPlayer.role !== "mrwhite" &&
             currentPlayer?.isEliminated &&
@@ -180,6 +162,13 @@ export const Results = () => {
             <div className="mt-4">
               <CountdownBar timeLeft={guessTimeLeft} total={guessTimer} />
             </div>
+          )}
+
+          {/* Everyone else waits while Mr. White makes the final guess */}
+          {isMrWhiteGuessing && !currentPlayerGotEliminated && (
+            <p className="mt-4 text-white/80 animate-pulse">
+              {t("results.waitingForGuess", { name: eliminatedPlayer.name })}
+            </p>
           )}
 
           {isMrWhiteGuessing && currentPlayerGotEliminated && (
@@ -219,15 +208,6 @@ export const Results = () => {
         }
         lastEliminatedId={gameState.lastEliminatedId}
       />
-
-      <Button
-        onClick={handleContinue}
-        className="w-full"
-        disabled={!canContinue}
-        variant={canContinue ? "default" : "secondary"}
-      >
-        {t("results.continueGame")}
-      </Button>
     </div>
   );
 };

@@ -70,7 +70,7 @@ export const GameSetup = () => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 w-full">
-            <code className="bg-white/5 px-4 py-2 rounded-lg text-[#1EAEDB] font-mono text-lg w-full text-center">{hostId}</code>
+            <code className="bg-white/5 px-4 py-2 rounded-lg text-neon-cyan font-mono [text-shadow:0_0_10px_rgba(34,229,255,0.5)] text-lg w-full text-center">{hostId}</code>
             <Link className="h-5 w-5 text-white/70 group-hover:text-white transition-colors" aria-label={t("gameSetup.shareLabel")} />
           </div>
         </div>
@@ -220,7 +220,7 @@ export const GameSetup = () => {
 
           <div className="space-y-2">
             {!hasEnoughPlayers && (
-              <div className="text-red-500 text-sm text-center mb-2">
+              <div className="text-neon-mrwhite text-sm text-center mb-2">
                 {t("gameSetup.atLeastFourPlayers")}
               </div>
             )}
@@ -228,7 +228,7 @@ export const GameSetup = () => {
               onClick={startGame}
               size="lg"
               disabled={!isHost || !hasEnoughPlayers}
-              className="w-full bg-primary hover:bg-primary/90 text-lg font-medium transition-colors duration-200 disabled:opacity-50"
+              className={`w-full text-lg font-semibold disabled:opacity-50 ${isHost && hasEnoughPlayers ? "animate-glow-pulse" : ""}`}
             >
               {t("gameSetup.startGame", { count: gameState.players.length })}
             </Button>

@@ -11,6 +11,10 @@ import { Results } from "../components/Results";
 import { GameEnd } from "../components/GameEnd";
 import { Button } from "@/components/ui/button";
 import { Github, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useState } from "react";
+import { buildScreenPreview, PREVIEW_SCREENS, PreviewScreen } from "@/dev/previewState";
+import { useTranslation } from "react-i18next";
+import { showEliminationToast } from "@/lib/eliminationToast";
 import { SoundProvider, useSound } from "@/context/SoundContext";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 const MuteToggle = () => {
@@ -28,8 +32,34 @@ const MuteToggle = () => {
   );
 };
 
+// Dev-only screen preview with a sample game: ?preview=voting or ?preview=discussion
+const previewParam = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("preview") : null;
+const previewScreen = PREVIEW_SCREENS.find(s => s === previewParam);
+
+const ScreenPreview = ({ screen }: { screen: PreviewScreen }) => {
+  const { setGameState } = useGame();
+  const { peer, hostGame } = usePeer();
+  const [ready, setReady] = useState(false);
+
+  // Wait for our peer ID so the sample game can include "you"
+  useEffect(() => {
+    if (!peer) return;
+    // Setup is only interesting as the host (editable roles/timer, game ID shown)
+    if (screen === "setup") hostGame("Priya");
+    const rounds = Number(new URLSearchParams(window.location.search).get("rounds")) || 2;
+    setGameState(buildScreenPreview(peer.id, screen, rounds));
+    setReady(true);
+  }, [peer]);
+
+  return ready ? <PhaseScreen /> : <div className="text-center text-white/70">Loading preview…</div>;
+};
+
 const GameContent = () => {
   const { hostId } = usePeer();
+
+  if (previewScreen) {
+    return <ScreenPreview screen={previewScreen} />;
+  }
 
   if (!hostId) {
     return <MultiplayerSetup />;
@@ -63,15 +93,29 @@ const PhaseScreen = () => {
   }
 };
 
+let toastPreviewShown = false;
+
 const Index = () => {
+  const { t } = useTranslation();
+
+  // Dev-only: open http://localhost:8080/?previewToasts to see all three elimination toasts
+  useEffect(() => {
+    if (!import.meta.env.DEV || !new URLSearchParams(window.location.search).has("previewToasts")) return;
+    if (toastPreviewShown) return; // StrictMode runs effects twice in dev
+    toastPreviewShown = true;
+    showEliminationToast(t, "Alex", "civilian");
+    showEliminationToast(t, "Sam", "undercover");
+    showEliminationToast(t, "Jo", "mrwhite");
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-accent via-secondary to-accent text-white">
+    <div className="min-h-screen text-white">
       <div className="w-full px-4 py-3">
         <SoundProvider>
           <GameProvider>
             <PeerProvider>
               {/* Full width here; each screen sets its own max width (the discussion table can use it all) */}
-              <div className="flex w-full flex-col gap-4">
+              <div className="w-full space-y-4">
                 <div className="mx-auto flex w-full max-w-4xl justify-end gap-2">
                   <MuteToggle />
                   <LanguageSwitcher />

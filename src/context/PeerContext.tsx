@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { isDuplicateComment } from "@/lib/comments";
+import { sanitizeStateFor } from "@/lib/sanitizeState";
 import { Peer, DataConnection } from "peerjs";
 import { useGame } from "./GameContext";
 import { toast } from "sonner";
@@ -75,19 +76,18 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
         };
       }
       
+      // The latest state reaches the new player through the broadcast effect below
+      // once the connection is registered (sending `gameState` here would be the stale first value)
       conn.on("open", () => {
         setConnections(prev => ({ ...prev, [conn.peer]: conn }));
-
-        if (gameState) {
-          conn.send({ type: "GAME_STATE", state: gameState });
-        }
       });
 
       conn.on("close", () => {
         console.log("Connection closed with:", conn.peer);
 
+        const name = gameStateRef.current.players.find(p => p.id === conn.peer)?.name;
         removePlayer(conn.peer);
-        toast.error(t("peer.playerDisconnected", { name: gameState.players.find(p => p.id === conn.peer)?.name || t("peer.unknownPlayer") }));
+        toast.error(t("peer.playerDisconnected", { name: name || t("peer.unknownPlayer") }));
 
         setConnections(prev => {
           const newConnections = { ...prev };
@@ -96,36 +96,39 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
         });
       });
 
+      // Votes, comments and guesses are always credited to the connection they came from
+      // (conn.peer), never to an ID inside the message, so nobody can act for someone else
       conn.on("data", (data: any) => {
         console.debug("Received data:", data);
         switch (data.type) {
           case "JOIN_GAME":
             console.log("New player joining:", data.username);
             playSound("/sounds/player-joined.mp3");
-            addPlayer(data.username, conn.peer);
-            conn.send({ type: "GAME_STATE", state: gameState });
-            break;
-          case "GAME_STATE":
-            console.debug("Received game state:", data.state);
-            setGameState(data.state);
+            addPlayer(String(data.username ?? "").slice(0, 25) || t("peer.unknownPlayer"), conn.peer);
             break;
           case "SUBMIT_VOTE":
             console.debug("Received vote:", data);
-            submitVote(data.voterId, data.targetId);
+            submitVote(conn.peer, data.targetId);
             break;
           case "SUBMIT_DESCRIPTION":
             console.debug("Received description:", data);
-            // Only the host sees early comments, so it alone can catch every duplicate
-            if (isDuplicateComment(gameStateRef.current, data.playerId, data.description)) {
+            // The host has the latest revealed comments, so it makes the final call
+            if (isDuplicateComment(gameStateRef.current, data.description)) {
               conn.send({ type: "COMMENT_REJECTED", reason: "duplicate" });
               break;
             }
-            submitDescription(data.playerId, data.description);
+            submitDescription(conn.peer, String(data.description).slice(0, 100));
             break;
-          case "MR_WHITE_GUESS":
+          case "MR_WHITE_GUESS": {
             console.debug("Received Mr. White guess:", data);
-            submitMrWhiteGuess(data.guess);
+            // Only the Mr. White who was just voted out may guess
+            const state = gameStateRef.current;
+            const guesser = state.players.find(p => p.id === conn.peer);
+            if (state.lastEliminatedId === conn.peer && guesser?.role === "mrwhite") {
+              submitMrWhiteGuess(String(data.guess).slice(0, 50));
+            }
             break;
+          }
           default:
             console.log("Unknown data type:", data.type);
         }
@@ -244,14 +247,8 @@ export const PeerProvider = ({ children }: { children: React.ReactNode }) => {
   const sendGameState = (state: GameState) => {
     console.debug("Sending game state to all connections:", state);
     Object.values(connections).forEach(conn => {
-      // Each player only receives their own not-yet-revealed comment
-      const playerState = {
-        ...state,
-        players: state.players.map(p =>
-          p.id === conn.peer || !p.pendingDescription ? p : { ...p, pendingDescription: undefined }
-        ),
-      };
-      conn.send({ type: "GAME_STATE", state: playerState });
+      // Each player only receives what they're allowed to know (no other roles, words or early comments)
+      conn.send({ type: "GAME_STATE", state: sanitizeStateFor(state, conn.peer) });
     });
   };
 

@@ -8,6 +8,8 @@ import { useSound } from "@/context/SoundContext";
 import { useTranslation } from "react-i18next";
 import { useCountdown } from "@/hooks/use-countdown";
 import { CountdownBar } from "./shared/CountdownBar";
+import { RoundTable } from "./shared/RoundTable";
+import { useAttention } from "@/hooks/use-attention";
 
 export const VotingScreen = () => {
   const { gameState, submitVote, closeVoting } = useGame();
@@ -25,6 +27,9 @@ export const VotingScreen = () => {
   const currentPlayer = gameState.players.find(p => p.id === peer?.id);
   const hasVoted = currentPlayer && gameState.votingResults?.[currentPlayer.id];
   const isEliminated = currentPlayer?.isEliminated;
+
+  // Flag the browser tab until you've voted
+  useAttention(!!currentPlayer && !isEliminated && !hasVoted);
 
   // Voting gets the same time as a speaker turn; a re-vote restarts it
   const voteTimer = gameState.turnTimer ?? 0;
@@ -76,18 +81,18 @@ export const VotingScreen = () => {
     .filter(p => p && !p.isEliminated && !gameState.votingResults?.[p.id]);
 
   const pendingPanel = (
-    <Card className="p-4 glass-morphism md:sticky md:top-4">
+    <Card className="p-4 glass-morphism lg:sticky lg:top-4">
       <div className="flex items-center gap-2 text-white/90 mb-3">
-        <Hourglass className="h-4 w-4" />
+        <Hourglass className="h-4 w-4 text-neon-amber" />
         <span className="font-semibold">{t("voting.stillToVote", { count: pendingVoters.length })}</span>
       </div>
       {pendingVoters.length > 0 ? (
         <ul className="space-y-2">
           {pendingVoters.map(player => (
             <li key={player.id} className="flex items-center gap-2 rounded-md bg-white/5 px-3 py-2 text-sm text-white">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400 animate-pulse" />
+              <span className="h-2 w-2 shrink-0 rounded-full bg-neon-amber shadow-[0_0_8px_#ffc53d] animate-pulse" />
               <span className="truncate">{player.name}</span>
-              {player.id === peer?.id && <span className="text-primary">{t("common.you")}</span>}
+              {player.id === peer?.id && <span className="text-neon-cyan/80">{t("common.you")}</span>}
             </li>
           ))}
         </ul>
@@ -97,14 +102,28 @@ export const VotingScreen = () => {
     </Card>
   );
 
+  // From round 2 on, show this game's comments so voters can look back before deciding
+  const gameNumber = gameState.gameNumber ?? 1;
+  const roundTable = gameState.currentRound >= 2
+    ? (gameState.history ?? []).filter(r => r.game === gameNumber && r.round <= gameState.currentRound)
+    : [];
+
+  // Desktop: comments table | player list (centered) | still to vote. Smaller screens stack them.
   const layout = (title: string, main: React.ReactNode) => (
-    <div className="max-w-3xl mx-auto p-6 space-y-6 animate-fade-in">
-      <h2 className="text-2xl font-bold text-center mb-4 text-gradient">{title}</h2>
-      {tieBanner}
-      {countdown}
-      <div className="grid gap-6 md:grid-cols-[1fr_220px] md:items-start">
-        <div className="space-y-4">{main}</div>
-        {pendingPanel}
+    <div className="w-full p-6 space-y-6 animate-fade-in">
+      <div className="mx-auto max-w-md space-y-4">
+        <h2 className="text-2xl font-bold text-center text-gradient">{title}</h2>
+        {tieBanner}
+        {countdown}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_28rem_minmax(0,1fr)] lg:items-start">
+        <div className="mx-auto w-full max-w-md space-y-4 lg:max-w-none lg:col-start-2 lg:row-start-1">{main}</div>
+        <div className="mx-auto w-full max-w-md lg:max-w-[16rem] lg:mx-0 lg:col-start-3 lg:row-start-1">{pendingPanel}</div>
+        {roundTable.length > 0 && (
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:sticky lg:top-4">
+            <RoundTable rounds={roundTable} title={t("wordReveal.commentsSoFar")} />
+          </div>
+        )}
       </div>
     </div>
   );

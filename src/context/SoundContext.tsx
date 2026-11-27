@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 
 const SoundContext = createContext<{
   playSound: (src: string) => void;
@@ -20,6 +20,11 @@ export const SoundProvider = ({ children }: { children: React.ReactNode }) => {
     }
   });
 
+  // Read through a ref: some callers (peer connection handlers) keep the first playSound they got,
+  // and must still respect the current mute setting
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
+
   useEffect(() => {
     try {
       localStorage.setItem("muted", String(isMuted));
@@ -27,25 +32,29 @@ export const SoundProvider = ({ children }: { children: React.ReactNode }) => {
       // storage unavailable — keep in-memory state only
     }
   }, [isMuted]);
-  const audioCache = new Map<string, HTMLAudioElement>();
+
+  // Kept across renders (a plain Map here would be recreated every render, losing the preloads)
+  const audioCache = useRef(new Map<string, HTMLAudioElement>()).current;
 
   useEffect(() => {
     const soundsToPreload = ["/sounds/submit-vote.wav", "/sounds/new-page.mp3", "/sounds/click-sound.mp3"];
     soundsToPreload.forEach((src) => {
       const audio = new Audio(src);
-      audio.preload = "auto"; 
+      audio.preload = "auto";
       audioCache.set(src, audio);
     });
   }, []);
 
   const playSound = (src: string) => {
-    if (!isMuted) {
+    if (!isMutedRef.current) {
       let audio = audioCache.get(src);
       if (!audio) {
         audio = new Audio(src); // Fallback in case sound wasn't preloaded
         audioCache.set(src, audio);
       }
-      audio.play();
+      audio.currentTime = 0;
+      // Browsers block audio until the user has interacted with the page; that's fine to ignore
+      audio.play().catch(() => {});
     }
   };
 

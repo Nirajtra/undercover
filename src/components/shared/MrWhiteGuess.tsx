@@ -8,14 +8,16 @@ export const MrWhiteGuess = () => {
 
     if (!gameState.mrWhiteGuess) return null;
 
-    const isCorrect = gameState.mrWhiteGuess.toLowerCase() === gameState.majorityWord.toLowerCase();
+    // Decided by the host (players don't receive the secret word until the game is over)
+    const isCorrect = !!gameState.mrWhiteGuessCorrect;
     return (
-      <div className={`mt-4 p-4 rounded-lg ${isCorrect ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
+      <div className={`mt-4 p-4 rounded-lg border ${isCorrect ? 'bg-neon-mrwhite/10 border-neon-mrwhite/40' : 'bg-neon-civilian/10 border-neon-civilian/40'}`}>
         <div className="flex items-center gap-2">
+          {/* A correct guess is a win for Mr. White (red); a wrong one is good news for civilians (green) */}
           {isCorrect ? (
-            <CheckCircle className="text-green-500" />
+            <CheckCircle className="text-neon-mrwhite" />
           ) : (
-            <XCircle className="text-red-500" />
+            <XCircle className="text-neon-civilian" />
           )}
           <p className="text-white">
             {t("gameEnd.mrWhiteGuessed")} <span className="font-bold">{gameState.mrWhiteGuess}</span>

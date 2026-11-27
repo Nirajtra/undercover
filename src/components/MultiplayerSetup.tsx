@@ -17,7 +17,21 @@ export const MultiplayerSetup = () => {
   const [showJoinForm, setShowJoinForm] = useState(searchParams.get("gameId") != undefined);
   const [showHostForm, setShowHostForm] = useState(false);
   const [joinId, setJoinId] = useState(showJoinForm ? searchParams.get("gameId") : "");
-  const [username, setUsername] = useState("");
+  // Remember the name between games (per browser)
+  const [username, setUsername] = useState(() => {
+    try {
+      return localStorage.getItem("username") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("username", username);
+    } catch {
+      // storage unavailable — the name just isn't remembered
+    }
+  }, [username]);
 
   useEffect(() => {
     const gameId = searchParams.get("gameId");
@@ -50,13 +64,13 @@ export const MultiplayerSetup = () => {
   };
 
   return (
-    <Card className="max-w-md mx-auto p-6 space-y-6 animate-fade-in glass-morphism">
+    <Card className="max-w-md mx-auto p-6 space-y-6 glass-morphism hud-corners">
       <div className="space-y-4">
         {!showHostForm && !showJoinForm && (
           <div className="space-y-4">
             <Button
               onClick={() => setShowHostForm(true)}
-              className="w-full bg-primary hover:bg-primary/90 transition-colors duration-200"
+              className="w-full font-semibold animate-glow-pulse"
             >
               <UserPlus className="mr-2 h-4 w-4" />
               {t("multiplayerSetup.hostNewGame")}
@@ -72,7 +86,8 @@ export const MultiplayerSetup = () => {
             
             <Button
               onClick={() => setShowJoinForm(true)}
-              className="w-full bg-secondary hover:bg-secondary/90 transition-colors duration-200"
+              variant="secondary"
+              className="w-full font-semibold"
             >
               <Users className="mr-2 h-4 w-4" />
               {t("multiplayerSetup.joinGame")}

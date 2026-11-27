@@ -9,14 +9,16 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Electric blue → cyan with a glow; lifts on hover, presses in on click
+        default:
+          "bg-primary bg-gradient-to-r from-blue-600 to-cyan-500 text-primary-foreground shadow-[0_0_18px_rgba(79,107,255,0.45)] hover:brightness-110 hover:-translate-y-0.5 hover:shadow-[0_0_26px_rgba(59,130,246,0.65)] active:translate-y-0 active:scale-[0.98] transition-all",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-[0_0_18px_rgba(255,51,102,0.4)]",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-white/15 bg-white/[0.03] backdrop-blur hover:bg-white/10 hover:text-white",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+          "bg-white/[0.06] border border-white/10 text-secondary-foreground backdrop-blur hover:bg-white/10",
+        ghost: "hover:bg-white/10 hover:text-white",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
