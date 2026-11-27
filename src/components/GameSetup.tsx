@@ -13,7 +13,7 @@ import { distributionMeetsLimits } from "@/config/roleDistribution";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 
-const TIMER_PRESETS = [10, 20, 30, 40];
+const TIMER_PRESETS = [10, 20, 30, 40, 50, 60];
 const MIN_CUSTOM_SECONDS = 5;
 const MAX_CUSTOM_SECONDS = 300;
 

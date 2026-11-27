@@ -25,11 +25,15 @@ export const RoundTable = ({
       <table className="w-full text-left text-sm">
         <thead className="bg-white/5 text-white/70">
           <tr>
-            <th className="px-3 py-2 font-medium">{t("history.player")}</th>
-            {showRoles && <th className="px-3 py-2 font-medium">{t("history.role")}</th>}
+            <th className="px-2 py-1.5 font-medium">{t("history.player")}</th>
+            {showRoles && <th className="px-2 py-1.5 font-medium">{t("history.role")}</th>}
             {sortedRounds.map(r => (
-              <th key={r.round} className="px-3 py-2 font-medium whitespace-nowrap">
-                {t("history.round", { number: r.round })}
+              <th
+                key={r.round}
+                title={t("history.round", { number: r.round })}
+                className="px-2 py-1.5 font-medium whitespace-nowrap"
+              >
+                {t("history.roundShort", { number: r.round })}
               </th>
             ))}
           </tr>
@@ -37,12 +41,12 @@ export const RoundTable = ({
         <tbody>
           {[...players.entries()].map(([id, player]) => (
             <tr key={id} className={`border-t border-white/10 ${id === highlightPlayerId ? "bg-primary/10" : ""}`}>
-              <td className="px-3 py-2 text-white whitespace-nowrap">
+              <td className="px-2 py-1.5 text-white whitespace-nowrap">
                 {player.name}
                 {/* Once someone is voted out their role is public, so show it next to their name */}
                 {!showRoles && player.role && sortedRounds.some(r => r.eliminatedId === id) && (
                   <span
-                    className={`ml-2 rounded px-1.5 py-0.5 text-xs font-semibold ${
+                    className={`ml-1.5 rounded px-1 py-0.5 text-xs font-semibold ${
                       player.role === "civilian" ? "bg-white/10 text-white/70" : "bg-red-500/30 text-red-200"
                     }`}
                   >
@@ -51,7 +55,7 @@ export const RoundTable = ({
                 )}
               </td>
               {showRoles && (
-                <td className="px-3 py-2 text-white/70 whitespace-nowrap">
+                <td className="px-2 py-1.5 text-white/70 whitespace-nowrap">
                   {player.role ? t(`roles.${player.role}`) : "—"}
                 </td>
               )}
@@ -59,10 +63,10 @@ export const RoundTable = ({
                 const entry = r.entries.find(e => e.playerId === id);
                 const role = r.eliminatedId === id ? (entry?.role ?? player.role) : undefined;
                 return (
-                  <td key={r.round} className="px-3 py-2 text-white/80 min-w-[7rem] break-words">
+                  <td key={r.round} className="px-2 py-1.5 text-white/80 break-words">
                     {entry ? (entry.text || "—") : <span className="text-white/30">·</span>}
                     {r.eliminatedId === id && (
-                      <span className="ml-2 inline-block rounded bg-red-500/30 px-1.5 py-0.5 text-xs text-red-300 whitespace-nowrap">
+                      <span className="ml-1.5 inline-block rounded bg-red-500/30 px-1 py-0.5 text-xs text-red-300 whitespace-nowrap">
                         {role ? t("history.outAs", { role: t(`roles.${role}`) }) : t("history.out")}
                       </span>
                     )}

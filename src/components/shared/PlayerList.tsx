@@ -1,4 +1,5 @@
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Users, UserX } from "lucide-react";
 import { Player } from "../../types/game";
 import { useEffect, useState } from "react";
@@ -17,6 +18,7 @@ interface PlayerListProps {
   showScores?: boolean;
   tieBreakerPlayers?: string[];
   allPlayers?: Player[]; // for voter names when `players` is filtered (e.g. tie re-vote)
+  onVote?: (playerId: string) => void; // shows a Vote button on each row (except your own)
 }
 
 export const PlayerList = ({
@@ -31,6 +33,7 @@ export const PlayerList = ({
   showScores,
   tieBreakerPlayers = [],
   allPlayers,
+  onVote,
 }: PlayerListProps) => {
   const { playSound } = useSound();
   const { t } = useTranslation();
@@ -189,6 +192,16 @@ export const PlayerList = ({
                     </div>
                   )}
                 </div>
+                {/* Vote button on each row: used in VotingScreen.tsx */}
+                {onVote && player.id !== currentPlayerId && !player.isEliminated && (
+                  <Button
+                    size="sm"
+                    onClick={(e) => { e.stopPropagation(); onVote(player.id); }}
+                    className="shrink-0 bg-primary hover:bg-primary/90"
+                  >
+                    {t("voting.vote")}
+                  </Button>
+                )}
                 {/* Scores Overview: used in GameSetup.tsx */}
                 {showScores && (
                   <div className="flex items-center gap-3">

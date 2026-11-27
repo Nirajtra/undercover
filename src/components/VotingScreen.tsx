@@ -1,9 +1,8 @@
 import { useGame } from "../context/GameContext";
 import { usePeer } from "../context/PeerContext";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Hourglass } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { PlayerList } from "./shared/PlayerList";
 import { useSound } from "@/context/SoundContext";
 import { useTranslation } from "react-i18next";
@@ -14,15 +13,13 @@ export const VotingScreen = () => {
   const { gameState, submitVote, closeVoting } = useGame();
   const { peer, isHost, sendToHost } = usePeer();
   const { playSound } = useSound();
-  const [selectedPlayer, setSelectedPlayer] = useState<string>("");
   const { t } = useTranslation();
 
   const tieCandidates = gameState.tieCandidates;
 
-  // Play again and clear the old selection when a tie re-vote starts
+  // Play again when a tie re-vote starts
   useEffect(() => {
     playSound("/sounds/new-page.mp3");
-    setSelectedPlayer("");
   }, [tieCandidates?.join(",")]);
 
   const currentPlayer = gameState.players.find(p => p.id === peer?.id);
@@ -34,28 +31,20 @@ export const VotingScreen = () => {
   const voteTimerKey = `${gameState.currentRound}-${tieCandidates?.join(",") ?? "all"}`;
   const timeLeft = useCountdown(voteTimer, voteTimerKey);
 
-  const handleVote = () => {
+  // Voting happens straight from the Vote button on a player's row
+  const handleVote = (targetId: string) => {
+    if (!currentPlayer || hasVoted) return;
     playSound("/sounds/submit-vote.wav");
-    if (currentPlayer && selectedPlayer) {
-      //playSound("/sounds/vote.mp3");
-      if (isHost) {
-        submitVote(currentPlayer.id, selectedPlayer);
-      } else {
-        sendToHost({
-          type: "SUBMIT_VOTE",
-          voterId: currentPlayer.id,
-          targetId: selectedPlayer
-        });
-      }
+    if (isHost) {
+      submitVote(currentPlayer.id, targetId);
+    } else {
+      sendToHost({
+        type: "SUBMIT_VOTE",
+        voterId: currentPlayer.id,
+        targetId
+      });
     }
   };
-
-  // When time runs out, a selected-but-unsent vote is submitted
-  useEffect(() => {
-    if (timeLeft === 0 && !isEliminated && !hasVoted && selectedPlayer) {
-      handleVote();
-    }
-  }, [timeLeft]);
 
   // The host closes voting shortly after the timer ended; non-voters are skipped
   useEffect(() => {
@@ -135,25 +124,12 @@ export const VotingScreen = () => {
 
   return layout(
     t("voting.voteToEliminate"),
-    <>
-      <PlayerList
-        players={activePlayers}
-        selectedPlayer={selectedPlayer}
-        onPlayerClick={!hasVoted ? setSelectedPlayer : undefined}
-        allPlayers={gameState.players}
-        votingResults={gameState.votingResults}
-        currentPlayerId={peer?.id}
-      />
-
-      {!hasVoted && (
-        <Button
-          onClick={handleVote}
-          disabled={!selectedPlayer}
-          className="w-full bg-primary hover:bg-primary/90"
-        >
-          {t("voting.submitVote")}
-        </Button>
-      )}
-    </>
+    <PlayerList
+      players={activePlayers}
+      onVote={!hasVoted ? handleVote : undefined}
+      allPlayers={gameState.players}
+      votingResults={gameState.votingResults}
+      currentPlayerId={peer?.id}
+    />
   );
 };

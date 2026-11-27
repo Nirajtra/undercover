@@ -270,13 +270,14 @@ export const WordReveal = () => {
   }
 
   return (
-    <div className="w-full mx-auto p-6 animate-fade-in grid gap-6 md:grid-cols-[minmax(0,1fr)_28rem] md:items-start">
+    // Main column stays centered; the table takes all the space to its left (scrolls only if it overflows)
+    <div className="w-full p-6 animate-fade-in grid gap-6 lg:grid-cols-[minmax(0,1fr)_28rem_minmax(0,1fr)] lg:items-start">
       {/* Left on desktop, below the main content on mobile */}
-      <div className="order-last md:order-first space-y-2 md:sticky md:top-4">
+      <div className="order-last min-w-0 space-y-2 lg:order-none lg:col-start-1 lg:row-start-1 lg:sticky lg:top-4">
         <h3 className="text-lg font-semibold text-white">{t("wordReveal.commentsSoFar")}</h3>
         <RoundTable rounds={roundTable} highlightPlayerId={currentSpeakerId} />
       </div>
-      {main}
+      <div className="w-full max-w-md mx-auto lg:max-w-none lg:col-start-2 lg:row-start-1">{main}</div>
     </div>
   );
 };
